@@ -1,0 +1,24 @@
+{
+  "subject_root": "200",
+  "items": [
+    {
+      "stem": "如图，在正方形$ABCD$中，点$E$，$F$分别在$AD$，$BC$上，点$B$，$C$关于$EF$对称，点$M$在$EF$上，点$N$在$AE$上，且点$A$，$M$关于$BN$对称，$BM$的延长线交$AD$于点$H$，$CM$交$BD$于点$G$，则$\\frac{AH}{CG}=$______.\n![](D:/workplace/book-ai/teacher-mcp/.paper_imgs/G4B_fig20.png)",
+      "question_type": 4,
+      "kp_id": "200005003002",
+      "images": [{"local_path": "D:\\workplace\\book-ai\\teacher-mcp\\.paper_imgs\\G4B_fig20.png", "role": "stem"}],
+      "source_raw": "PRD-C-208 G4b 扫描PDF样例(转图多模态) 奕辰错题集 p1",
+      "source_type": 9,
+      "external_key": "PRDC208-G4B-001"
+    },
+    {
+      "stem": "（真题·杭州滨江）已知$BD$是▱$ABCD$的对角线。小滨和小江分别用尺规作特殊的平行四边形：\n(1)小滨：如图1，作$BD$的中垂线，分别交$BC$,$AD$,$BD$于点$E$,$F$,$O$，连结$BF$,$DE$，则得到的四边形$BEDF$是菱形。请问小滨的作法是否正确？若正确，请证明；若不正确，请说明理由。\n(2)小江：如图2，过$BD$中点$O$作直线$MQ$，分别交$AB$,$CD$于点$M$,$Q$。以点$O$为圆心，$OM$长为半径画弧，与边$AD$交于点$N$，连结$NO$并延长$NO$交$BC$于点$P$，连结$MN$,$NQ$,$QP$,$PM$，则得到的四边形$MPQN$是矩形，请问小江的作法是否正确？若正确，请证明；若不正确，请说明理由。\n![](D:/workplace/book-ai/teacher-mcp/.paper_imgs/G4B_fig21.png)",
+      "question_type": 5,
+      "kp_id": "200005002003",
+      "secondary_kps": ["200005001004"],
+      "images": [{"local_path": "D:\\workplace\\book-ai\\teacher-mcp\\.paper_imgs\\G4B_fig21.png", "role": "stem"}],
+      "source_raw": "PRD-C-208 G4b 扫描PDF样例(转图多模态) 奕辰错题集 p1 第21题(真题·杭州滨江)",
+      "source_type": 1,
+      "external_key": "PRDC208-G4B-002"
+    }
+  ]
+}

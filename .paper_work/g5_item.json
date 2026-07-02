@@ -1,0 +1,15 @@
+{
+  "subject_root": "200",
+  "items": [
+    {
+      "stem": "已知$\\triangle ABC$内角$\\angle BAC=\\alpha(0°<\\alpha<180°)$，分别以$AB$，$AC$为边向外侧作等边$\\triangle ABM$和等边$\\triangle ACN$，连接$CM$，$BN$交于点$O$.\n(1)如图1，判断$\\angle MON$是否随$\\alpha$的变化而变化？如果不变化，请求出$\\angle MON$的度数；如果变化，请用$\\alpha$的代数式表示$\\angle MON$的度数；\n(2)连接$MN$，再依次连接$MB$，$BC$，$CN$，$NM$四条线段的中点$D$，$E$，$F$，$G$，得到四边形$DEFG$.\n①如图2，若$\\alpha=90°$，$AB=4cm$，$AC=3cm$，求四边形$DEFG$的面积；\n②若$\\triangle ABM$的面积是$12\\sqrt{3}$，$\\triangle ACN$，$\\triangle AMN$的面积都是$4\\sqrt{3}$，求$\\triangle ABC$的面积.\n![](D:/workplace/book-ai/测试数据/录入测试/bd68008310e366b46279e5a259311f38.jpg)",
+      "question_type": 5,
+      "kp_id": "200004004002",
+      "secondary_kps": ["500002003003"],
+      "images": [{"local_path": "D:\\workplace\\book-ai\\测试数据\\录入测试\\bd68008310e366b46279e5a259311f38.jpg", "role": "stem"}],
+      "source_raw": "PRD-C-208 G5 手拍照片样例(多模态直读,含手写批注噪声)",
+      "source_type": 9,
+      "external_key": "PRDC208-G5-001"
+    }
+  ]
+}
