@@ -17,6 +17,14 @@ import os
 import sys
 from pathlib import Path
 
+# 🔴 强制 stdout/stderr UTF-8：Windows 默认 gbk 管道遇工具返回的 \xa0/中文节点名会 UnicodeEncodeError 崩掉
+#    （AC7 verifier 反馈①根治）——不再依赖 fresh agent 先 set PYTHONIOENCODING。
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 

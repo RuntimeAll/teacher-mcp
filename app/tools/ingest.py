@@ -13,7 +13,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.dicts import ANNO_ERROR, ANNO_SCENE
-from app.paperparse import dedup_key, infer_type, plain_text
+from app.paperparse import FIG, FIG_IDS, dedup_key, infer_type, plain_text
 from app.ruoyi import RuoyiClient, RuoyiError
 from app.tools.compose import _standard_scores
 
@@ -41,12 +41,19 @@ class ImageRef(BaseModel):
 # ───────────────────── PRD-C-208 契约面板：IngestItem（未知字段一律拒绝） ─────────────────────
 
 class ItemImage(BaseModel):
-    """IngestItem 的图：local_path（工具代传 OSS 并把题面里同名占位替换为 ossUrl）或 ossUrl（已传好直用）。"""
+    """IngestItem 的图：local_path（工具代传 OSS）或 ossUrl（已传好直用）。工具会把题面里的占位替换成图。
+
+    题面占位可用两种写法，工具都能自动替换成 ![](ossUrl)：
+      ① `〖图:rId4〗` 标记（convert_doc 原生产出）→ 配 images[].rid="rId4"；
+      ② 字面 local_path 串（你自己拼进题面的）→ 配 images[].local_path（正/反斜杠均可）。
+    未被任何图匹配的残留 〖图:...〗 标记会被自动清掉，不污染题面。
+    """
     model_config = ConfigDict(extra="forbid")
 
     local_path: str = Field(default="", description="本地绝对路径（工具代传 OSS）")
     ossUrl: str = Field(default="", description="已有 OSS url（与 local_path 二选一）")
     assetId: Optional[int] = Field(default=None, description="image_asset id（配 ossUrl 时带上）")
+    rid: str = Field(default="", description="convert_doc 的 〖图:rId〗 标记 id（如 rId4）；给了则自动把题面同 rid 标记替换成图")
     role: str = Field(default="stem", description="stem/figure/analysis")
 
 
@@ -272,6 +279,7 @@ def register(mcp, client: RuoyiClient) -> None:
                 stem_md, analyze_md, answer_md = it.stem, it.analyze, it.answer
                 opts_md = list(it.options or [])
                 images_meta: list[dict] = []
+                rid2oss: dict = {}      # convert_doc 〖图:rId〗 标记 → ossUrl
                 # ── 图：local_path 代传 OSS + 占位替换；ossUrl 直用 ──
                 for im in it.images or []:
                     oss, aid = im.ossUrl or None, im.assetId
@@ -288,7 +296,23 @@ def register(mcp, client: RuoyiClient) -> None:
                             analyze_md = analyze_md.replace(raw, oss)
                             opts_md = [o.replace(raw, oss) for o in opts_md]
                     if oss:
+                        if im.rid:
+                            rid2oss[im.rid] = oss
                         images_meta.append({"ossUrl": oss, "assetId": aid, "role": im.role or "stem"})
+
+                # ── 〖图:rId〗 标记自动替换（convert_doc 原生产物直喂）：映射到的 rid → ![](oss)，
+                #    未映射的 rid + 无 rid 的 〖图〗 一律清掉，不污染题面（AC7 verifier 反馈②根治）──
+                def _imagify(s: str) -> str:
+                    def rep(m):
+                        out = ""
+                        for r in [x.strip() for x in m.group(1).split(",")]:
+                            if r in rid2oss:
+                                out += f"![]({rid2oss[r]})"
+                        return out
+                    return FIG.sub("", FIG_IDS.sub(rep, s))
+                if "〖图" in stem_md or "〖图" in analyze_md or any("〖图" in o for o in opts_md):
+                    stem_md, analyze_md = _imagify(stem_md), _imagify(analyze_md)
+                    opts_md = [_imagify(o) for o in opts_md]
 
                 # ── 受控词表校验（选词别造铁律）：非法词剔除并 warning，合法词原样落 ──
                 err_ok = [e for e in (it.err or []) if e in ANNO_ERROR]

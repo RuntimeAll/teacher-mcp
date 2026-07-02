@@ -29,7 +29,7 @@
 |---|---|---|
 | **单题文本** | 你判断 | 直接构造 1 条 IngestItem → `ingest_items` |
 | **多题文本/粘贴** | 你判断 | `parse_paper_text`（确定性拆）或你自拆 → 补全 → `ingest_items` |
-| **Word（.docx / docx伪装.doc）** | 后缀+PK头 | `convert_doc` → `parse_paper_text` → 你补全（图 rId→构造 IngestItem.images.local_path）→ `ingest_items` |
+| **Word（.docx / docx伪装.doc）** | 后缀+PK头 | `convert_doc` → `parse_paper_text` → 你补全 → `ingest_items`。**图直接把题面里的 `〖图:rId4〗` 标记原样留着，并在 `images` 里给 `{local_path: convert_doc返回的该rid路径, rid:"rId4"}`——工具会自动把标记替换成图并清残留**（无需你手动改题面） |
 | **PDF（文字层）** | pymupdf 检出文字层 | 🔴 数学/科学卷公式抽取不可信（H1a spike 实测）→ **一律 `convert_pdf` 转图 → 你多模态读页拆题 → `ingest_items`**；文字层文本仅辅助（题号定位/纯文字题） |
 | **PDF（扫描/图片型）** | 无文字层 | `convert_pdf` 转图 → 你多模态读页拆题 → `ingest_items` |
 | **图片（单/多张，含手拍）** | 后缀 | 你多模态直读拆题（完整转写题面为 markdown+$LaTeX$，整图/裁图挂 images.local_path）→ `ingest_items` |
@@ -115,6 +115,8 @@
 
 # 跑 / 自检
 前置：平台 BE 在 `.env` 的 `RUOYI_BASE_URL`（默认 :8080，A 线录入 BE）在跑；MySQL :3307（dev 库 `ai_lesson_prep`）在跑。
+> ℹ️ `mcp_call.py` 已内置强制 stdout UTF-8，Windows 下无需再 set 环境变量即可正常输出中文/公式（含 `\xa0`）。若你另写脚本调工具，同样记得 `sys.stdout.reconfigure(encoding="utf-8")`。
+> ℹ️ 成卷时 `PaperSpec.total_score` 仅在**所有题 score 都为 0**时按标准分铺满；只要有题带了 score（如题面解析分），则用题面分求和为卷面总分（total_score 被覆盖属预期）。
 
 ```powershell
 # 装依赖（独立 venv，别和 toolkit 混）
