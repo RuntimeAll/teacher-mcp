@@ -23,5 +23,12 @@ class Settings(BaseSettings):
     ruoyi_username: str = ""
     ruoyi_password: str = ""
 
+    # dev 库直连（PRD-C-208 3.3-b：模型链/难度依据/卷目录/KG查表 pymysql 收口，见 app/db.py 头注释）
+    db_host: str = "127.0.0.1"
+    db_port: int = 3307
+    db_user: str = "root"
+    db_password: str = "123456"
+    db_database: str = "ai_lesson_prep"
+
 
 settings = Settings()

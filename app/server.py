@@ -16,6 +16,7 @@ from mcp.server.fastmcp import FastMCP
 from app.ruoyi import RuoyiClient
 from app.tools import auth as tool_auth
 from app.tools import compose as tool_compose
+from app.tools import convert as tool_convert
 from app.tools import ingest as tool_ingest
 from app.tools import kg as tool_kg
 from app.tools import label as tool_label
@@ -39,10 +40,11 @@ def _cleanup() -> None:
 
 # ── 工具注册（加能力 = 在此 register 一行）──
 tool_auth.register(mcp, _client)        # login（身份层）
-tool_kg.register(mcp, _client)          # list_kg_tree（读层）
-tool_compose.register(mcp, _client)     # compose_paper（写层·探针能力①组卷）
-tool_ingest.register(mcp, _client)      # format_question / upload_image / ingest_question（写层·能力②录入）
+tool_kg.register(mcp, _client)          # list_kg_tree / resolve_kg（读层：整树 + 锚定查表）
+tool_compose.register(mcp, _client)     # compose_paper / create_paper / update_paper（写层·能力①组卷）
+tool_ingest.register(mcp, _client)      # format/upload/ingest_question + 🔴ingest_items 统一入库口（写层·能力②录入，PRD-C-208）
 tool_label.register(mcp, _client)       # label_question（打标层·能力③ DNA 打标：难度/锚/解法骨架/变式底料）
+tool_convert.register(mcp, _client)     # convert_doc / convert_pdf / parse_paper_text（转换层·确定性预处理，PRD-C-208）
 # 二期占位（同样「加一个 tools 目录 + register 一行」）：
 #   from app.tools import variants as tool_variants; tool_variants.register(mcp, _client)   # make_variants（举一反三）
 #   from app.tools import kgbuild as tool_kgbuild; tool_kgbuild.register(mcp, _client)       # build_kg

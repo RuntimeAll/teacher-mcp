@@ -101,14 +101,9 @@ def ensure_category(root_id, chap_id):
 
 
 def make_digest(qs):
-    out = []
-    # 用位置序号 i(1..N)=DB sort（入库按 parse 顺序编号），不用 q["num"]（原卷题号遇杂散「N.」会错位）
-    for i, q in enumerate(qs, 1):
-        opt = "  [" + " | ".join(q["options"]) + "]" if q["options"] else ""
-        stem = plain_text(q["stem"]).replace("\n", " ")
-        fig = "🖼" if q["has_fig"] else "  "
-        out.append(f'#{i:>2} t{q["type"]}{fig}{int(q["score"])}分 | {stem[:90]}{opt[:60]}  =答:{q["answer"][:40]}')
-    return "\n".join(out)
+    # 逻辑上提 app/paperparse.make_digest（PRD-C-208；90 字轻管线口径），位置序号=DB sort 约定不变
+    from app.paperparse import make_digest as _md
+    return _md(qs, stem_width=90)
 
 
 def main():

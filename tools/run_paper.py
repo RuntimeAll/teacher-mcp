@@ -22,16 +22,10 @@ from tools.ingest_paper import parse_paper, plain_text  # noqa: E402
 
 
 def make_digest(txt_path):
+    # 🔴 位置序号=DB sort 约定不变；digest 逻辑上提 app/paperparse.make_digest（PRD-C-208；全文口径）
+    from app.paperparse import make_digest as _md
     qs = parse_paper(Path(txt_path).read_text(encoding="utf-8"))
-    out = []
-    # 🔴 用位置序号 i(1..N) 当题号 = DB biz_paper_question.sort（入库按 parse 顺序编 sort）。
-    #    不用 q["num"]（parser 从原卷抓的题号，遇卷内杂散「N.」会错标/重号，致打标 num→sort 错位）。
-    for i, q in enumerate(qs, 1):
-        opt = "  [" + " | ".join(q["options"]) + "]" if q["options"] else ""
-        stem = plain_text(q["stem"]).replace("\n", " ")
-        fig = "🖼" if q["has_fig"] else "  "
-        out.append(f'#{i:>2} t{q["type"]}{fig}{int(q["score"])}分 | {stem}{opt}  =答:{q["answer"][:50]}')
-    return qs, "\n".join(out)
+    return qs, _md(qs)
 
 
 def main():
