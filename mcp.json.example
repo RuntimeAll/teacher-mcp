@@ -1,0 +1,12 @@
+{
+  "//": "PRD-C-1000 终验：让真·本地 Claude Code 连 teacher-mcp。把本块合进 book-ai/.mcp.json 的 mcpServers 后【重启 Claude session】(MCP 不热加载)。",
+  "mcpServers": {
+    "teacher-mcp": {
+      "command": "d:\\workplace\\book-ai\\teacher-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "app.server"],
+      "env": {
+        "PYTHONPATH": "d:\\workplace\\book-ai\\teacher-mcp"
+      }
+    }
+  }
+}

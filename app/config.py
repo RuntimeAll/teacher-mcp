@@ -1,0 +1,27 @@
+"""teacher-mcp 配置 —— 从 .env 读（pydantic-settings）。凭据不硬编码、不入 git。
+
+🔴 env_file 用绝对路径（基于本文件定位），免受 MCP server 被 stdio client 以任意 cwd 拉起的影响。
+"""
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_ENV = Path(__file__).resolve().parent.parent / ".env"
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=str(_ENV), env_file_encoding="utf-8", extra="ignore"
+    )
+
+    # RuoYi 底座（C 线 book-server :8090）
+    ruoyi_base_url: str = "http://localhost:8090"
+    ruoyi_client_id: str = "e5cd7e4891bf95d1d19206ce24a7b32e"
+    ruoyi_tenant_id: str = "000000"
+
+    # 真账号身份：正式由 login 工具传参；以下仅 login 不传参时兜底 + 冒烟用
+    ruoyi_username: str = ""
+    ruoyi_password: str = ""
+
+
+settings = Settings()
