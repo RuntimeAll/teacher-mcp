@@ -1,0 +1,61 @@
+{
+ "subject_root": "100",
+ "items": [
+  {
+   "stem": "比较大小：$-\\frac{3}{4}$ ______ $-\\frac{4}{5}$（填「>」「<」或「=」）",
+   "question_type": 4,
+   "answer": ">",
+   "analyze": "两负数比大小，绝对值大的反而小：$|-\\frac{3}{4}|=\\frac{15}{20}<|-\\frac{4}{5}|=\\frac{16}{20}$，故 $-\\frac{3}{4}>-\\frac{4}{5}$。",
+   "kp_id": "100001004003",
+   "source_raw": "PRD-C-208 G2 粘贴文本样例",
+   "source_type": 6,
+   "external_key": "PRDC208-G2-001"
+  },
+  {
+   "stem": "数轴上表示 $-3$ 的点与表示 $5$ 的点之间的距离是（  ）",
+   "options": [
+    "$2$",
+    "$8$",
+    "$-8$",
+    "$3$"
+   ],
+   "answer": "B",
+   "analyze": "数轴两点距离=坐标差的绝对值：$|5-(-3)|=8$，选 B。",
+   "question_type": 1,
+   "kp_id": "100001002002",
+   "source_raw": "PRD-C-208 G2 粘贴文本样例",
+   "source_type": 6,
+   "external_key": "PRDC208-G2-002"
+  },
+  {
+   "stem": "若 $|a-2|+|b+3|=0$，求 $a+b$ 的值。",
+   "question_type": 5,
+   "answer": "$a+b=-1$",
+   "analyze": "绝对值非负性：两非负数和为零则各自为零，$a=2$，$b=-3$，$a+b=-1$。",
+   "kp_id": "100001003002",
+   "source_raw": "PRD-C-208 G2 粘贴文本样例",
+   "source_type": 6,
+   "external_key": "PRDC208-G2-003"
+  },
+  {
+   "stem": "计算：$(-1)^{2025}+(-1)^{2024}$ 的结果是 ______。",
+   "question_type": 4,
+   "answer": "$0$",
+   "analyze": "$(-1)$ 的奇次幂为 $-1$、偶次幂为 $1$，$-1+1=0$。",
+   "kp_id": "100002005001002",
+   "source_raw": "PRD-C-208 G2 粘贴文本样例",
+   "source_type": 6,
+   "external_key": "PRDC208-G2-004"
+  },
+  {
+   "stem": "某地一天的最高气温为 $8^{\\circ}C$，最低气温为 $-5^{\\circ}C$，则这天的温差为 ______ $^{\\circ}C$。",
+   "question_type": 4,
+   "answer": "$13$",
+   "analyze": "温差=最高-最低：$8-(-5)=13$。",
+   "kp_id": "100002002001001",
+   "source_raw": "PRD-C-208 G2 粘贴文本样例",
+   "source_type": 6,
+   "external_key": "PRDC208-G2-005"
+  }
+ ]
+}
