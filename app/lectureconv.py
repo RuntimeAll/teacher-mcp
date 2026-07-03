@@ -274,6 +274,85 @@ def split_frags(content, course_l4, kp_by_name):
     return frags, unmatched, inner_h3
 
 
+def cuicui_split(content, course_l4, kp_by_name):
+    """🔴 崔崔版式配方（确定性适配器，七上科学 30+ docx 通用）—— docx→10 知识点讲解片段。
+
+    崔崔版式实测（1.2.1/1.2.2 等一致）：
+      模块一：知识精讲 (H3)  ← 讲解主体，本适配器只切它
+        ├─ 长度测量 / 体积测量 (H3 分组头，丢弃：知识点名已自带信息)
+        │    └─ 测量的含义 / 长度的单位 … (H4，命中 KG 知识点名 → 一个片段)
+      模块二：习题精练 (H3) / 模块三：巩固提升 (H3)  ← 全是题目，走题库(208)拿 qid，本适配器只返回其区间供后续处理
+
+    配方规则：
+      1. 定位「模块一知识精讲」区间（首个含「知识精讲」的 H3 → 下一个「模块二/习题/巩固」H3 或文末）。
+      2. 区间内按「标题文本 == KG 知识点名（去空白）」切片；**匹配到的知识点标题提升为 H3**（与库内片段一致）。
+      3. 分组头 H3（长度测量/体积测量）丢弃；知识点内的污染 H4（零刻度线：…）自然归入当前知识点。
+    返回: (frags[{subject_id,kg_level,title,content_json_nodes,stem_text}] 按序, missing_kp_names, exercise_sections[{h3,start,end}])
+          或 None（未识别出崔崔版式，调用侧应回退 assist 人工映射）。
+    """
+    def norm(s):
+        return "".join(s.split())
+
+    kp_norm = {norm(k): v for k, v in kp_by_name.items()}
+    id2name = {v: k for k, v in kp_by_name.items()}
+
+    # 1. 定位模块一区间 + 习题模块区间
+    m1_start = None
+    m1_end = len(content)
+    exercise_sections = []
+    for i, n in enumerate(content):
+        if n.get("type") == "heading" and n.get("attrs", {}).get("level") == 3:
+            t = norm(node_text(n))
+            if m1_start is None and "知识精讲" in t:
+                m1_start = i
+            elif m1_start is not None and ("习题精练" in t or "巩固提升" in t or t.startswith("模块")):
+                if m1_end == len(content):
+                    m1_end = i
+                exercise_sections.append({"h3": node_text(n).strip(), "start": i})
+    if m1_start is None:
+        return None  # 非崔崔版式 → 回退 assist
+
+    # 习题区间收尾（每个习题模块 end = 下一个模块起点 or 文末）
+    for k, sec in enumerate(exercise_sections):
+        sec["end"] = exercise_sections[k + 1]["start"] if k + 1 < len(exercise_sections) else len(content)
+
+    # 2. 模块一区间内按 H4 命中 KG 知识点名切片
+    body = content[m1_start + 1:m1_end]
+    frags_nodes = {}
+    order = []
+    cur = None
+    for n in body:
+        t = n.get("type")
+        lv = n.get("attrs", {}).get("level") if t == "heading" else None
+        txt = node_text(n).strip()
+        if t == "heading" and lv == 3:
+            continue  # 分组头（长度测量/体积测量），丢弃
+        if t == "heading" and norm(txt) in kp_norm:
+            cur = kp_norm[norm(txt)]
+            if cur not in frags_nodes:
+                frags_nodes[cur] = []
+                order.append(cur)
+            # 知识点标题提升为 H3（与库内其余片段一致）
+            frags_nodes[cur].append({"type": "heading", "attrs": {"level": 3}, "content": n.get("content", [])})
+            continue
+        if cur is not None:
+            frags_nodes[cur].append(n)
+        # 知识点前的散块（模块一开头）丢弃：崔崔版式此处无内容
+
+    frags = []
+    for sid in order:
+        nodes = frags_nodes[sid]
+        frags.append({
+            "subject_id": sid,
+            "kg_level": len(sid) // 3,
+            "title": id2name[sid],
+            "content_json_nodes": nodes,
+            "stem_text": "".join(node_text(x) for x in nodes),
+        })
+    missing = [id2name[v] for v in kp_by_name.values() if v not in frags_nodes]
+    return frags, missing, exercise_sections
+
+
 def sections_by_h3(content):
     """把忠实 content 按顶层 H3 切成可读段（供 agent 理解式映射时看清模块/分组边界）。
 

@@ -133,8 +133,9 @@
 
 | 来源 | 版式特征 | 路径 |
 |---|---|---|
-| **崔崔 docx（教师版/原卷版）** | 模块(H3)>分组(H3)>知识点(H4)，H3≠知识点 | `convert_lecture_docx(mode='assist')` 出忠实内容+分段+KG靶子 → **你理解式映射**：读 `raw_path` 全文，按 `kg_targets` 把模块一「知识精讲」的讲解重组成片段 IR（每片段 subjectId=知识点id）；习题模块的题走题库拿 qid |
-| **已清洗 docx（H3==知识点名）** | H3 就是 KG 知识点名 | `convert_lecture_docx(mode='auto')` 直接确定性切片 + 里外目录对齐闸 → 得 `ir_path` |
+| 🔴 **崔崔 docx（教师版/原卷版）** | 模块一知识精讲>分组>知识点(H4) + 模块二/三习题 | `convert_lecture_docx(mode='cuicui')` **确定性适配器**（七上科学 30+ docx 通用配方）：自动切模块一为 10 知识点讲解片段（知识点标题提 H3）+ 覆盖闸校验（缺知识点即 FAIL）+ 返回习题模块区间。直接得 `ir_path`，上传图 → `save_lecture_frag` |
+| **新/异常崔崔版式** | mode='cuicui' 覆盖闸 FAIL 或识别不出模块一 | 回退 `mode='assist'`：出忠实内容+分段+KG靶子 → **你理解式映射**（读 `raw_path` 按 `kg_targets` 重组），确认后可反哺 `cuicui_split` 配方 |
+| **已清洗 docx（H3==知识点名）** | H3 就是 KG 知识点名 | `convert_lecture_docx(mode='auto')` 确定性 H3 切片 + 里外目录对齐闸 → 得 `ir_path` |
 | **扫描/图片讲义（PDF 无文字层）** | pymupdf 检不到文字层 | `convert_pdf` 转图（170dpi，208 H1b 路线）→ 你多模态读页、按 `kg_targets` 映射成片段 IR |
 | **预处理 JSON（片段 IR）** | 已是 §契约 结构 | 校验 subjectId 真实 → 直接 `save_lecture_frag` |
 | **新版式（必刷等教辅）** | 未见过 | 🔴 **先转 1-2 页样例、把「这段→哪个片段节点」映射摆给维护者确认**，对齐后才批量（PRD-C-210 §2：版式配方每套一份，先 pilot 再投产） |
@@ -153,8 +154,9 @@
 
 | 工具 | 作用 |
 |---|---|
-| `convert_lecture_docx(docx_path, course_subject_id, book_id?, batch?, mode?)` | 讲义 docx→忠实 Tiptap 内容+KG 知识点靶子+图清单。`mode='assist'`(默认，出原料给你理解式映射) / `'auto'`(H3==知识点的清洗源才用，直接确定性切片+对齐闸)。图出 `〖图:rId〗` 占位+rid |
-| 🔴 `save_lecture_frag(ir_path? / frags?, book_id?, image_map?, owner?, allow_toc_fail?)` | 片段 IR→C 线 :8090 upsert 入库（唯一入库口，幂等覆盖）。`image_map={rid:ossUrl}` 回填图；`__UNMATCHED__` 片段默认拦截（对齐闸）；省略 owner=登录者（admin=官方库） |
+| `convert_lecture_docx(docx_path, course_subject_id, book_id?, batch?, mode?)` | 讲义 docx→片段 IR / 原料。`mode='cuicui'`(🔴崔崔版式确定性适配器，出 10 知识点讲解 IR+覆盖闸+习题区间) / `'assist'`(默认，出原料给你理解式映射) / `'auto'`(H3==知识点的清洗源，确定性 H3 切片+对齐闸)。图出 `〖图:rId〗` 占位+rid |
+| 🔴 `save_lecture_frag(ir_path? / frags?, book_id?, image_map?, owner?, allow_toc_fail?)` | 片段 IR→C 线 :8090 upsert 入库（唯一入库口，幂等覆盖 updated）。`image_map={rid:ossUrl}` 回填图；`__UNMATCHED__` 片段默认拦截（对齐闸）；省略 owner=登录者（admin=官方库） |
+| `remove_lecture_frag(subject_prefix, book_id?, owner?)` | 删某 owner 某前缀下的讲义片段（覆盖录入的「先删」步，打 :8090）。🔴 前缀到课时(12位)会连课时级思维导图一并删——想保留导图就别用课时前缀 |
 
 > 复用题目录入的工具：`ingest_items`（例题/习题过题库拿 qid）、`upload_image`（图传 OSS）、`resolve_kg`（查知识点 id）、`format_question`。
 

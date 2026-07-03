@@ -133,6 +133,25 @@ def register(mcp, cluster: RuoyiCluster) -> None:
 
         WORK.mkdir(exist_ok=True)
 
+        if mode == "cuicui":
+            # 🔴 崔崔版式确定性适配器（七上科学 30+ docx 通用配方，见 lectureconv.cuicui_split）
+            res = lectureconv.cuicui_split(content, course_subject_id, kp_by_name)
+            if res is None:
+                return {"ok": False, "reason": "未识别出崔崔「模块一知识精讲」结构；改用 mode='assist' 人工映射",
+                        "hint_sections": lectureconv.sections_by_h3(content)}
+            frags, missing, exercise_sections = res
+            ir_frags, summary = _build_ir(frags, course_subject_id, course_kg_name)
+            ir_path = WORK / f"{name}_ir.json"
+            ir_path.write_text(json.dumps({"book_id": book_id, "course_subject_id": course_subject_id,
+                                           "frags": ir_frags}, ensure_ascii=False, indent=1), encoding="utf-8")
+            coverage_ok = not missing
+            return {"ok": True, "mode": "cuicui", "course": course, "frag_count": len(ir_frags),
+                    "frags": summary, "coverage": {"kp_total": len(kg_targets), "covered": len(ir_frags),
+                                                   "missing": missing, "verdict": "PASS" if coverage_ok else "FAIL"},
+                    "exercise_sections": exercise_sections, "images": images, "ir_path": str(ir_path), "stats": stats,
+                    "note": ("覆盖闸 PASS：讲解 10 片段就绪，上传图后 save_lecture_frag；习题走 exercise_sections→208 拿 qid 挂 kgExample"
+                             if coverage_ok else f"🔴 覆盖闸 FAIL：知识点 {missing} 无讲解片段，人工核对（版式可能偏离崔崔标准）")}
+
         if mode == "auto":
             frags, unmatched, inner_h3 = lectureconv.split_frags(content, course_subject_id, kp_by_name)
             toc = lectureconv.toc_diff(inner_h3, outer_names)
@@ -232,6 +251,32 @@ def register(mcp, cluster: RuoyiCluster) -> None:
             return {"ok": False, "reason": str(e)}
         if isinstance(resp, dict):
             resp["unresolved_images"] = sorted(set(unresolved_all))
+        return resp
+
+    @mcp.tool()
+    async def remove_lecture_frag(subject_prefix: str, book_id: str = "CC7S", owner: int = None) -> dict:
+        """删除某 owner 在某 subjectId 前缀下的讲义片段（覆盖录入的「先删」步；打 C 线 :8090）。需先 login。
+
+        🔴 前缀 LIKE 删除：`subject_prefix='901001002001'`(课时L4) 会删该课时**自身 + 全部子知识点**片段——
+           连课时级思维导图(kgMindmap)一并删，想保留导图就别用课时前缀，改删到知识点段（或逐个知识点前缀）。
+           BE 强制 subjectPrefix≥9 位(节级)防误删整册。owner 省略=登录者（admin=uid1 官方库）。
+        参数:
+          subject_prefix : subjectId 前缀（≥9 位）；删该前缀下该 owner 的所有片段
+          book_id        : 教辅套 id
+          owner          : 归属 uid；省略=登录者
+        返回: BE {ok, removed}（removed=删除行数）。
+        """
+        if not subject_prefix or len(subject_prefix) < 9:
+            return {"ok": False, "reason": "subject_prefix 至少 9 位（节级），防误删整册"}
+        body = {"bookId": book_id, "subjectPrefix": subject_prefix}
+        body["owner"] = owner if owner is not None else None
+        try:
+            c = await cluster.ensure_c()
+            if body["owner"] is None:
+                body["owner"] = c.user_id  # BE remove 要求 owner 必填；省略=登录者
+            resp = await c.teacher_post("/teacher/kg/lecture-frag/remove", body)
+        except RuoyiError as e:
+            return {"ok": False, "reason": str(e)}
         return resp
 
 
