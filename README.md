@@ -140,15 +140,30 @@
 | **预处理 JSON（片段 IR）** | 已是 §契约 结构 | 校验 subjectId 真实 → 直接 `save_lecture_frag` |
 | **新版式（必刷等教辅）** | 未见过 | 🔴 **先转 1-2 页样例、把「这段→哪个片段节点」映射摆给维护者确认**，对齐后才批量（PRD-C-210 §2：版式配方每套一份，先 pilot 再投产） |
 
-## 理解式映射流程（崔崔版式主路，端到端）
+## 崔崔版式流水线（端到端，每册重复这几步；可复用脚本在 `pipeline/`）
 
-1. `login(admin, ...)`（讲义官方库 owner=uid1；`save_lecture_frag` 省略 owner 即落官方库）。
-2. `convert_lecture_docx(docx_path, course_subject_id, mode='assist')` → 拿 `kg_targets`（该课时 10 个知识点）+ `sections`（顶层 H3 分段，看清模块一讲解 / 模块二三习题边界）+ `images`（图清单）+ `raw_path`（忠实全文）。
-3. **读 `raw_path`**，把「模块一·知识精讲」的讲解**按 kg_targets 重组成片段 IR**：`[{subjectId:知识点id, title:知识点名, contentJson:{type:doc,content:[...]}}]`。崔崔版式里知识点名恰在 H4，可按「H4 命中 KG 知识点名」切、污染 H4（如「零刻度线：…」）自然归入当前知识点。🔴 **每片段的知识点名标题统一提到 H3**（`{"type":"heading","attrs":{"level":3}}`）——与库内其余片段一致，`/lecture-hub` 汇聚按 H3 认知识点；片段内的子标题（刻度尺构造等）保持原级。**覆盖校验：该课时每个知识点都要有片段**（缺则报告，别静默）。
-4. **习题模块**（模块二习题精练 / 模块三巩固提升）：每题走 `ingest_items` 录进题库拿 qid → 在对应知识点片段的 contentJson 里插 `{"type":"kgExample","attrs":{"qid":该qid,"knowledgeId":知识点id}}` 节点。
-5. **图**：`images[].local_path` 逐张 `upload_image` 拿 ossUrl，攒成 `image_map={rId: ossUrl}`。
-6. `save_lecture_frag(frags=你的片段IR, book_id, image_map=image_map)` → upsert 落 :8090；省略 owner=官方库覆盖（UK=subjectId+bookId+owner 幂等，重录=updated 不撞）。`unresolved_images` 报告没换成 OSS 的图（EMF/WMF 矢量图浏览器不支持，会被剔除）。
-7. **验收**：`GET /teacher/kg/lecture?subjectId=课时id&bookId=CC7S` 汇聚 H3 数==知识点数；`/lecture-hub` 点该课时看渲染（导图/讲解/例题卡/表格颜色忠实）。
+🔴 **三类题目都进题库、都绑知识点**，讲义里只留 `kgExample(qid)` 引用（三位一体铁律：题面/答案不复制进讲义）：
+- **例题**（模块一知识精讲里嵌的，带【答案】/【详解】）→ 题库 + 讲解片段里 kgExample（讲练一体）
+- **习题**（模块二习题精练 / 模块三巩固提升）→ 题库（按知识点可查；是否挂 kgExample 到讲义可选）
+
+1. `login(admin)` → 讲义官方库 owner=uid1；例题/习题录题也用 admin（data_admin 管道账号）。
+2. `convert_lecture_docx(docx, course_subject_id, mode='cuicui')` → **讲解 IR**（10 知识点片段，知识点标题已提 H3，覆盖闸校验）+ **习题原文** `exercise_raw_path`（带〖图〗+[H]标记）+ `kg_targets` + `images`。
+3. **例题提取 subagent**（每册 1 次，见 `pipeline/prompts/extract_examples.md`）：读讲解 IR 的**节点索引 dump**，标出每个知识点片段里例题的**精确节点段**（题面+答案+详解）+ 抽结构化数据。🔴 纯讲解片段（名师解读无答案详解）不抽；起始节点混了讲解句用 `keep_prefix_runs` 保留前 N 个 run。
+4. **习题解析 subagent**（每册 1 次，见 `pipeline/prompts/parse_exercises.md`）：读习题原文，拆题 + 绑细 kp_id（用 [H4] 分组当线索）→ 结构化 items。
+5. **bulk `ingest_items`**（例题批 + 习题批）→ 各拿 qid（入库即写 `biz_question_knowledge` 绑定；来源前缀自动剥进 source_raw；图走 `images[].local_path`）。
+6. **splice**：讲解片段里把例题节点段删掉、原位插 `{"type":"kgExample","attrs":{"qid":qid,"knowledgeId":知识点id}}` → `save_lecture_frag`（owner 省略=官方库覆盖，幂等 updated）。图占位 `image_map={rid:ossUrl}` 回填。
+7. **验收**：DB 断言讲义片段无 `【答案】/【详解】` 残留、kgExample.qid 全在 biz_question；`/lecture-hub` 点课时看渲染（讲解+例题卡+表格色+配图忠实）。
+8. **排队 DNA 打标**：题目进库后批量 `label_question`（难度表驱动/解法/易错/变式底料）——与录入解耦。
+
+> 🔴 智能只在第 3/4 步（LLM 解析题目结构 + 绑点），每册 2 次 subagent 调用（可并行）；转换/切段/落库/splice 全确定性。不评难度不判易错（留给第 8 步打标）。
+
+## 讲义工具集
+
+| 工具 | 作用 |
+|---|---|
+| `convert_lecture_docx(docx_path, course_subject_id, book_id?, batch?, mode?)` | 讲义 docx→片段 IR / 原料。`mode='cuicui'`(🔴崔崔版式确定性适配器，出 10 知识点讲解 IR+覆盖闸+习题原文 exercise_raw_path) / `'assist'`(出原料给理解式映射) / `'auto'`(H3==知识点的清洗源，确定性 H3 切片+对齐闸)。图出 `〖图:rId〗` 占位+rid |
+| 🔴 `save_lecture_frag(ir_path? / frags?, book_id?, image_map?, owner?, allow_toc_fail?)` | 片段 IR→C 线 :8090 upsert 入库（唯一入库口，幂等覆盖 updated）。`image_map={rid:ossUrl}` 回填图；`__UNMATCHED__` 片段默认拦截（对齐闸）；省略 owner=登录者（admin=官方库） |
+| `remove_lecture_frag(subject_prefix, book_id?, owner?)` | 删某 owner 某前缀下的讲义片段（覆盖录入的「先删」步，打 :8090）。🔴 前缀到课时(12位)会连课时级思维导图一并删——想保留导图就别用课时前缀 |
 
 ## 讲义工具集
 
