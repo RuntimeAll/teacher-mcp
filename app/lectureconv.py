@@ -227,12 +227,16 @@ def render_with_markers(nodes):
             lv = n.get("attrs", {}).get("level", 0)
             lines.append(f"[H{lv}] {render(n)}".rstrip())
         elif t == "table":
-            # 表格逐行拼（｜分隔），题目里表格少见但保留
+            # 表格 → markdown 表格语法（ingest/format 能渲染回真表格；格内图保留〖图:rId〗标记）。
+            # 🔴 别打平成一行 [表] 文本——表格型题面(选项对照表等)会丢结构（1.2.3 题1 教训）。
             rows = []
             for r in n.get("content", []):
-                cells = [render(c).strip() for c in r.get("content", [])]
-                rows.append(" ｜ ".join(cells))
-            lines.append("[表] " + " / ".join(rows))
+                cells = [(render(c).strip().replace("\n", " ") or " ") for c in r.get("content", [])]
+                rows.append("| " + " | ".join(cells) + " |")
+            if rows:
+                lines.append(rows[0])
+                lines.append("|" + "---|" * max(rows[0].count("|") - 1, 1))
+                lines.extend(rows[1:])
         else:
             line = render(n)
             if line.strip():
