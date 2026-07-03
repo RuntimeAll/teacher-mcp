@@ -79,6 +79,9 @@ KG(biz_subject) ──挂── 讲义片段(biz_kg_lecture_frag) ──kgExampl
 8. 排队 DNA 打标：题库题目批量 label_question（难度表驱动/解法/易错/变式底料）——与录入解耦，攒批再跑
 ```
 
+> 🔴 **打标状态机**（`biz_question`，录入管道自动写对，无需额外动作）：`label_status` 0=未标(AI未处理) / 1=AI已标 / 2=已审 / 3=存疑；另有 `annotate_status`(0未标/1已标全/2部分)、`label_confidence`、`labeled_by/at`。
+> **待打标队列 = `WHERE label_status=0`**；批量打标一批一行记 `biz_label_job`（total/done/failed 进度追踪），打完置 1 + labeled_by 记模型名。录入落库即 label_status=0——"AI 未处理"是显式状态，不靠记忆。
+
 ## 3. 关键决策（已拍板）
 
 | 事项 | 决策 | 原因 |
