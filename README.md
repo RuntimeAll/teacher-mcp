@@ -143,7 +143,7 @@
 
 1. `login(admin, ...)`（讲义官方库 owner=uid1；`save_lecture_frag` 省略 owner 即落官方库）。
 2. `convert_lecture_docx(docx_path, course_subject_id, mode='assist')` → 拿 `kg_targets`（该课时 10 个知识点）+ `sections`（顶层 H3 分段，看清模块一讲解 / 模块二三习题边界）+ `images`（图清单）+ `raw_path`（忠实全文）。
-3. **读 `raw_path`**，把「模块一·知识精讲」的讲解**按 kg_targets 重组成片段 IR**：`[{subjectId:知识点id, title:知识点名, contentJson:{type:doc,content:[...]}}]`。崔崔版式里知识点名恰在 H4，可按「H4 命中 KG 知识点名」切、污染 H4（如「零刻度线：…」）自然归入当前知识点。**覆盖校验：10 个知识点每个都要有片段**（缺则报告，别静默）。
+3. **读 `raw_path`**，把「模块一·知识精讲」的讲解**按 kg_targets 重组成片段 IR**：`[{subjectId:知识点id, title:知识点名, contentJson:{type:doc,content:[...]}}]`。崔崔版式里知识点名恰在 H4，可按「H4 命中 KG 知识点名」切、污染 H4（如「零刻度线：…」）自然归入当前知识点。🔴 **每片段的知识点名标题统一提到 H3**（`{"type":"heading","attrs":{"level":3}}`）——与库内其余片段一致，`/lecture-hub` 汇聚按 H3 认知识点；片段内的子标题（刻度尺构造等）保持原级。**覆盖校验：该课时每个知识点都要有片段**（缺则报告，别静默）。
 4. **习题模块**（模块二习题精练 / 模块三巩固提升）：每题走 `ingest_items` 录进题库拿 qid → 在对应知识点片段的 contentJson 里插 `{"type":"kgExample","attrs":{"qid":该qid,"knowledgeId":知识点id}}` 节点。
 5. **图**：`images[].local_path` 逐张 `upload_image` 拿 ossUrl，攒成 `image_map={rId: ossUrl}`。
 6. `save_lecture_frag(frags=你的片段IR, book_id, image_map=image_map)` → upsert 落 :8090；省略 owner=官方库覆盖（UK=subjectId+bookId+owner 幂等，重录=updated 不撞）。`unresolved_images` 报告没换成 OSS 的图（EMF/WMF 矢量图浏览器不支持，会被剔除）。
