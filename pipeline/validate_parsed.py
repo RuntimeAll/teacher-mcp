@@ -42,10 +42,12 @@ for i, it in enumerate(items, 1):
     if not str(it.get("answer", "")).strip():
         errs.append(f"题{i}: 缺 answer")
     stem = it.get("stem", "")
-    in_stem = set(re.findall(r"〖图:(rId\d+)〗", stem))
+    # 图标记可在 stem/options/analyze 任一处（ingest 的 _imagify 三处都替换）
+    all_text = stem + "\n" + "\n".join(it.get("options", [])) + "\n" + it.get("analyze", "")
+    in_text = set(re.findall(r"〖图:(rId\d+)〗", all_text))
     declared = set(it.get("image_rids", []))
-    if in_stem != declared:
-        errs.append(f"题{i}: 图标记不一致 stem={sorted(in_stem)} declared={sorted(declared)}")
+    if in_text != declared:
+        errs.append(f"题{i}: 图标记不一致 text={sorted(in_text)} declared={sorted(declared)}")
     if "【答案】" in stem or "【详解】" in stem:
         errs.append(f"题{i}: stem 混入答案/详解")
 

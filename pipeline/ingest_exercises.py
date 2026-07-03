@@ -22,8 +22,9 @@ DOCX = sys.argv[2] if len(sys.argv) > 2 else r"D:\workplace\book-ai\预研空间
 SUBJECT_ROOT = sys.argv[3] if len(sys.argv) > 3 else "901"
 
 # 图 rid → 本地路径
+BATCH = Path(DOCX).stem.replace("#", "_").replace(" ", "_")
 _, images_dict, _ = lectureconv.faithful_content(DOCX)
-imgs = lectureconv.extract_images(DOCX, str(ROOT / ".lecture_imgs"), "1.2.1_teacher", images_dict)
+imgs = lectureconv.extract_images(DOCX, str(ROOT / ".lecture_imgs"), BATCH, images_dict)
 rid2path = {i["rid"]: i["local_path"] for i in imgs}
 
 parsed = json.load(open(PARSED, encoding="utf-8"))
@@ -52,7 +53,7 @@ for it in items:
         ing["images"] = im
     batch["items"].append(ing)
 
-out = ROOT / ".lecture_work" / "1.2.1_ingest_batch.json"
+out = ROOT / ".lecture_work" / f"{BATCH}_ingest_batch.json"
 out.write_text(json.dumps(batch, ensure_ascii=False, indent=1), encoding="utf-8")
 print(f"batch 就绪 {len(batch['items'])} 题 → {out}")
 if missing_img:
