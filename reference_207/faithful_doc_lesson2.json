@@ -1,0 +1,5498 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "1.2"
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "科学测量"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 4
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "课时",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "2",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "  ",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "温度",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "的测量",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/52bc66913e4c4799a2ffcc557f8ebc37.png",
+    "width": 615,
+    "height": 270
+   }
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 3
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": " 模块一：知识精讲 "
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 3
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "温度的测量"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 4
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "温度"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "定义"
+    },
+    {
+     "type": "text",
+     "text": "："
+    },
+    {
+     "type": "text",
+     "text": "表示"
+    },
+    {
+     "type": "text",
+     "text": "物体的"
+    },
+    {
+     "type": "text",
+     "text": "冷热程度",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。温度相同的物体，冷热程度相同，例如0℃的水和0℃的冰相比，温度相同，冷热程度相同。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "单位"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "①"
+    },
+    {
+     "type": "text",
+     "text": "常用单位是"
+    },
+    {
+     "type": "text",
+     "text": "摄氏度",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，用"
+    },
+    {
+     "type": "text",
+     "text": "“"
+    },
+    {
+     "type": "text",
+     "text": "℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "”"
+    },
+    {
+     "type": "text",
+     "text": "表示。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "②"
+    },
+    {
+     "type": "text",
+     "text": "摄氏温度是这样规定的：在"
+    },
+    {
+     "type": "text",
+     "text": "标准大气压下",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，把"
+    },
+    {
+     "type": "text",
+     "text": "冰水混合物",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "的温度规定为"
+    },
+    {
+     "type": "text",
+     "text": "0℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，"
+    },
+    {
+     "type": "text",
+     "text": "水沸腾时的温度",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "规定为"
+    },
+    {
+     "type": "text",
+     "text": "100℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。0到100之间分为100等份，每一等份就表示1摄氏度，记作1℃。零摄氏度以下，应读作零下多少摄氏度。"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 4
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "温度计"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "原理"
+    },
+    {
+     "type": "text",
+     "text": "："
+    },
+    {
+     "type": "text",
+     "text": "实验室中常用的有"
+    },
+    {
+     "type": "text",
+     "text": "酒精",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "/",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "水银温度计",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，利用"
+    },
+    {
+     "type": "text",
+     "text": "液体热胀冷缩",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "的性质制成的。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "以水银温度计为例，温度计玻璃泡内水银受热时，水银柱上升，"
+    },
+    {
+     "type": "text",
+     "text": "反之"
+    },
+    {
+     "type": "text",
+     "text": "下降，观察液柱的长短变化就可以知道温度的高低。这里采用"
+    },
+    {
+     "type": "text",
+     "text": "转换",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "的科学思想，温度的变化通过液柱长度的变化来体现。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "构造"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "粗细均匀的玻璃管，管的下端有一个"
+    },
+    {
+     "type": "text",
+     "text": "玻璃泡",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，在管和玻璃泡中装有适量的水银或酒精等液体，外壳上刻有刻度"
+    },
+    {
+     "type": "text",
+     "text": "，"
+    },
+    {
+     "type": "text",
+     "text": "采用"
+    },
+    {
+     "type": "text",
+     "text": "放大",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "的科学思想，内径越"
+    },
+    {
+     "type": "text",
+     "text": "细",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，温度变化越"
+    },
+    {
+     "type": "text",
+     "text": "明显",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，"
+    },
+    {
+     "type": "text",
+     "text": "温度"
+    },
+    {
+     "type": "text",
+     "text": "测量"
+    },
+    {
+     "type": "text",
+     "text": "越"
+    },
+    {
+     "type": "text",
+     "text": "精确",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "常用液体温度计的种类："
+    },
+    {
+     "type": "text",
+     "text": "酒精",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "温度计、"
+    },
+    {
+     "type": "text",
+     "text": "水银",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "温度计、"
+    },
+    {
+     "type": "text",
+     "text": "煤油",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "温度计等。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "根据用途，"
+    },
+    {
+     "type": "text",
+     "text": "常见的温度计：实验室常用温度计、体温计"
+    },
+    {
+     "type": "text",
+     "text": "、"
+    },
+    {
+     "type": "text",
+     "text": "气温计"
+    },
+    {
+     "type": "text",
+     "text": "。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【名师解读】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "①"
+    },
+    {
+     "type": "text",
+     "text": "摄氏度是温度的常用单位，不是国际单位制中的单位，在国际上采用热力学温度，它的单位是开尔文，简称开，符号是K。热力学温度"
+    },
+    {
+     "type": "text",
+     "text": "（"
+    },
+    {
+     "type": "text",
+     "text": "T"
+    },
+    {
+     "type": "text",
+     "text": "）"
+    },
+    {
+     "type": "text",
+     "text": "与摄氏温度"
+    },
+    {
+     "type": "text",
+     "text": "（"
+    },
+    {
+     "type": "text",
+     "text": "t"
+    },
+    {
+     "type": "text",
+     "text": "）"
+    },
+    {
+     "type": "text",
+     "text": "的换算关系为T"
+    },
+    {
+     "type": "text",
+     "text": "＝"
+    },
+    {
+     "type": "text",
+     "text": "t"
+    },
+    {
+     "type": "text",
+     "text": "＋"
+    },
+    {
+     "type": "text",
+     "text": "273.15K。"
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/b4c7b07d3df443f180225e66bc82018b.png",
+    "width": 65,
+    "height": 115
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "②"
+    },
+    {
+     "type": "text",
+     "text": "如图为伽利略制造的第一个温度计，它可以测量气体的温度。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "工作原理：若外部大气压不变，在气温发生变化时，球形容器内气体质量不变，体积随之发生变化，使玻璃管内液面上升或下降，从而测量出气温的高低。当气温升高时，球形容器内气体体积膨胀，玻璃管内液面下降，反之升高。故温度计的刻度值"
+    },
+    {
+     "type": "text",
+     "text": "上小下大",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。"
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/3a1669617c6e4c2b8968e4752a5909b6.png",
+    "width": 593,
+    "height": 137
+   }
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 4
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "温度计的使用方法"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "使用温度计前的几点注意"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "①温度计的测量范围：是指最高能测量的温度到最低能测量的温度。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "若待测物体的温度超出这一范围，不但测不出温度值，还可能损坏温度计。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "②认清温度计的最小刻度：反映了温度计的精确程度。一般温度计的最小刻度为1℃，所以精确度不高，"
+    },
+    {
+     "type": "text",
+     "text": "体温计最小刻度为0.1℃，精确度较高",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "使用温度计测温度时的正确方法：选对、放对、读对、记对。"
+    }
+   ]
+  },
+  {
+   "type": "table",
+   "content": [
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "选对",
+           "marks": [
+            {
+             "type": "bold"
+            },
+            {
+             "type": "textStyle",
+             "attrs": {
+              "color": "#FFFFFF"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "选择测量范围合适的温度计，防止被测物体温度过高时，液柱将温度计胀裂。"
+          }
+         ]
+        },
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "若无法估计被测物体的温度，则应先用测量范围较大的温度计测量，然后再挑选合适的温度计，并使其最小刻度能符合实验精确度的要求"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "放对",
+           "marks": [
+            {
+             "type": "bold"
+            },
+            {
+             "type": "textStyle",
+             "attrs": {
+              "color": "#FFFFFF"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "玻璃泡与被测物体充分接触，不能碰到容器的底和壁；玻璃泡要全部浸入被测液体中"
+          }
+         ]
+        },
+        {
+         "type": "paragraph"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "读对",
+           "marks": [
+            {
+             "type": "bold"
+            },
+            {
+             "type": "textStyle",
+             "attrs": {
+              "color": "#FFFFFF"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "示数稳定后读数，不能将温度计从被测液体中拿出来读数；读数时视线要与温度计内的液面相平，如图所示"
+          }
+         ]
+        },
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "    "
+          }
+         ]
+        },
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "温度计读数的正确方法和错误方法"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "记对",
+           "marks": [
+            {
+             "type": "bold"
+            },
+            {
+             "type": "textStyle",
+             "attrs": {
+              "color": "#FFFFFF"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "记录数值和单位，0℃以下时，不要忘记负号"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【名师解读】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "①一般实验室常用温度计的测量范围为"
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "20℃～110℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，体温计的测量范围为"
+    },
+    {
+     "type": "text",
+     "text": "35℃～42℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，气温计的测量范围为"
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "40℃～50℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "；水银温度计的测量范围为"
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "39℃～357℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，酒精温度计的测量范围为"
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "117℃～78℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "②液体温度计"
+    },
+    {
+     "type": "text",
+     "text": "原理是"
+    },
+    {
+     "type": "text",
+     "text": "液体热胀冷缩",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "来测量温度的，当玻璃泡全部浸入被测液体时受热才均匀。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "③由于传热，容器的"
+    },
+    {
+     "type": "text",
+     "text": "底",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "和"
+    },
+    {
+     "type": "text",
+     "text": "壁",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "的温度通常与容器中液体的温度有差异，温度计的玻璃泡碰到容器的底和壁时，通常"
+    },
+    {
+     "type": "text",
+     "text": "不能准确反映液体的温度",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。离开被测液体，温度计玻璃泡就与空气接触，立即发生热传递，液柱长度就会发生变化。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "④温度计的刻度间隔较小，估读不太准确，在现阶段未做特别说明的情况下，可以"
+    },
+    {
+     "type": "text",
+     "text": "不用估读",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "到最小刻度的下一位。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "⑤温度计的示数代表玻璃泡内的液体的实时温度，当示数稳定时，说明内外温度相等，此时读数才是待测液体的准确温度。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "⑥"
+    },
+    {
+     "type": "text",
+     "text": "不能将温度计当成搅拌器使用",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，以免碰坏玻璃泡。实验完毕应把温度计外壁用软布擦干净并小心放于盒内，防止磕碰。因水银有毒，对已损坏的水银温度计必须及时将水银放入密闭的容器中封存，不能任其流失造成危害。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "⑦温度计示数由下往上越来越小，"
+    },
+    {
+     "type": "text",
+     "text": "“"
+    },
+    {
+     "type": "text",
+     "text": "0"
+    },
+    {
+     "type": "text",
+     "text": "”"
+    },
+    {
+     "type": "text",
+     "text": "刻度在示数的上方时，此时读数为"
+    },
+    {
+     "type": "text",
+     "text": "“"
+    },
+    {
+     "type": "text",
+     "text": "零下"
+    },
+    {
+     "type": "text",
+     "text": "”"
+    },
+    {
+     "type": "text",
+     "text": "，如图所示。"
+    },
+    {
+     "type": "text",
+     "text": "     "
+    },
+    {
+     "type": "text",
+     "text": "    "
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/88765093f6fd4388b09fd18a8c5c445d.png",
+    "width": 176,
+    "height": 53
+   }
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/b09dc08b5795411f8624f83fd7482cf7.png",
+    "width": 76,
+    "height": 143
+   }
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/f051b2251ab046269d6891ac2949fbd7.png",
+    "width": 142,
+    "height": 145
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "（"
+    },
+    {
+     "type": "text",
+     "text": "2024联考期中"
+    },
+    {
+     "type": "text",
+     "text": "）"
+    },
+    {
+     "type": "text",
+     "text": "使用温度计时，首先要观察它的量程和认清它的"
+    },
+    {
+     "type": "text",
+     "text": "             "
+    },
+    {
+     "type": "text",
+     "text": "。"
+    },
+    {
+     "type": "text",
+     "text": "用温度计测"
+    },
+    {
+     "type": "text",
+     "text": "量烧杯中"
+    },
+    {
+     "type": "text",
+     "text": "液体的"
+    },
+    {
+     "type": "text",
+     "text": "温度"
+    },
+    {
+     "type": "text",
+     "text": "，"
+    },
+    {
+     "type": "text",
+     "text": "分别"
+    },
+    {
+     "type": "text",
+     "text": "进行了三次操作，"
+    },
+    {
+     "type": "text",
+     "text": "如图"
+    },
+    {
+     "type": "text",
+     "text": "甲"
+    },
+    {
+     "type": "text",
+     "text": "所示"
+    },
+    {
+     "type": "text",
+     "text": "，其中正确的操作是"
+    },
+    {
+     "type": "text",
+     "text": "_________"
+    },
+    {
+     "type": "text",
+     "text": "。"
+    },
+    {
+     "type": "text",
+     "text": "图"
+    },
+    {
+     "type": "text",
+     "text": "乙"
+    },
+    {
+     "type": "text",
+     "text": "所示的是用温度计分别测得"
+    },
+    {
+     "type": "text",
+     "text": "的"
+    },
+    {
+     "type": "text",
+     "text": "冰和水的温度"
+    },
+    {
+     "type": "text",
+     "text": "，其中"
+    },
+    {
+     "type": "text",
+     "text": "冰的温度"
+    },
+    {
+     "type": "text",
+     "text": "是"
+    },
+    {
+     "type": "text",
+     "text": "_________"
+    },
+    {
+     "type": "text",
+     "text": "。其中"
+    },
+    {
+     "type": "text",
+     "text": "水的温度"
+    },
+    {
+     "type": "text",
+     "text": "是"
+    },
+    {
+     "type": "text",
+     "text": "_________"
+    },
+    {
+     "type": "text",
+     "text": "℃。"
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/6a75099d01104c8bad3ba08b5283ef6d.png",
+    "width": 437,
+    "height": 172
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "答案：最小刻度  ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "C",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "   ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "2",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "    ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "8",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "8",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "（",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "1",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "）",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "使用温度计测量液体的温度，要先观察它的量程和认清它的分度值",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "；",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "使用温度计测量液体的温度，温度计的玻璃瓶要全部浸入被测液体中不能离开液体读数，故选C。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "（",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "2",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "）",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "该温度计的分度值是1℃，测量冰的温度时，温度计中液柱的液面在0℃以下两格处，示数为",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "2℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "；（",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "3",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "）",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "测量水的温度时，温度计中液柱的液面在80℃C以上8格处，示数为88℃。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 4
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "体温计",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "体温计的构造特点"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "①有较大的玻璃泡且内径较细"
+    },
+    {
+     "type": "text",
+     "text": "，"
+    },
+    {
+     "type": "text",
+     "text": "玻璃泡与玻璃管之间"
+    },
+    {
+     "type": "text",
+     "text": "细弯",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "管",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。"
+    },
+    {
+     "type": "text",
+     "text": "分度值0.1℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，"
+    },
+    {
+     "type": "text",
+     "text": "量程35℃~42℃",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。"
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/526106eaf1d94267a8be79602d41b74f.png",
+    "width": 438,
+    "height": 127
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "当体温计离开人体时，温度下降，水银快速收缩，水银柱在"
+    },
+    {
+     "type": "text",
+     "text": "细弯管"
+    },
+    {
+     "type": "text",
+     "text": "断开，上面的玻璃管内的水银退不回玻璃泡，所以体温计能离开人体读数。"
+    },
+    {
+     "type": "text",
+     "text": "（"
+    },
+    {
+     "type": "text",
+     "text": "体温计内的水银柱不能自动退回玻璃泡内，测量前要用手捏紧体温计的上部，用力甩几下，使体温计内的水银柱回落到35℃以下"
+    },
+    {
+     "type": "text",
+     "text": "）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【名师解读】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "①"
+    },
+    {
+     "type": "text",
+     "text": "由于体温计水银柱更细，水银柱不易看清，因此体温计截面形状"
+    },
+    {
+     "type": "text",
+     "text": "为"
+    },
+    {
+     "type": "text",
+     "text": "弧形",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，"
+    },
+    {
+     "type": "text",
+     "text": "有利于"
+    },
+    {
+     "type": "text",
+     "text": "放大",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "水银柱，"
+    },
+    {
+     "type": "text",
+     "text": "白底",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "更易看清水银柱，便于读数。"
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/248138db7d3f4fe2948b05e0f3bb88b7.png",
+    "width": 149,
+    "height": 82
+   }
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/a89f79f574404784be4bfc608eb011ab.png",
+    "width": 125,
+    "height": 82
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "②"
+    },
+    {
+     "type": "text",
+     "text": "归纳体温计与实验室常用温度计的区别"
+    }
+   ]
+  },
+  {
+   "type": "table",
+   "content": [
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "仪器",
+           "marks": [
+            {
+             "type": "bold"
+            },
+            {
+             "type": "textStyle",
+             "attrs": {
+              "color": "#FFFFFF"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "体温计",
+           "marks": [
+            {
+             "type": "bold"
+            },
+            {
+             "type": "textStyle",
+             "attrs": {
+              "color": "#FFFFFF"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "实验室常用温度计",
+           "marks": [
+            {
+             "type": "bold"
+            },
+            {
+             "type": "textStyle",
+             "attrs": {
+              "color": "#FFFFFF"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "用途"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "测人的体温"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "测液体温度"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "测量范围"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "35℃~42℃，范围小"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "－"
+          },
+          {
+           "type": "text",
+           "text": "20C~110℃，范围大"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "最小刻度"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "0.19C"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1℃"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "构造"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "玻璃泡与玻璃管之间有一段"
+          },
+          {
+           "type": "text",
+           "text": "细弯管"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "内径细而均匀的玻璃管，下端玻璃泡"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "使用方法"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "能离开人体读数，用前需要用力甩几下"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "不能离开被测液体读数，用前"
+          },
+          {
+           "type": "text",
+           "text": "不需"
+          },
+          {
+           "type": "text",
+           "text": "甩"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "下列对体温计的有关说法正确的是"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A.体温计的测量范围是35℃~45℃"
+    },
+    {
+     "type": "text",
+     "text": "                 "
+    },
+    {
+     "type": "text",
+     "text": "B.体温计的最小刻度是1℃"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "C.某同学的体温是36.6℃，该同学体温正常"
+    },
+    {
+     "type": "text",
+     "text": "         "
+    },
+    {
+     "type": "text",
+     "text": "D.利用体温计也可以测量液体的温度"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "答案：C",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】体温计测量范围是35℃～42℃，液体温度可能低于35℃，也有可能高于42℃，因此不可以用体温计测量液体的温度，A、D错误；体温计的最小刻度是0.1℃，B错误。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "有一支温度计，虽然它的玻璃管内径和刻度都是均匀的，刻度却不准确。标准大气压下，它在冰水混合物中的示数是"
+    },
+    {
+     "type": "text",
+     "text": "－"
+    },
+    {
+     "type": "text",
+     "text": "1℃，在沸水中的示数是103℃ "
+    },
+    {
+     "type": "text",
+     "text": "。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "当它指示的温度是"
+    },
+    {
+     "type": "text",
+     "text": "－"
+    },
+    {
+     "type": "text",
+     "text": "6℃时，实际的温度是"
+    },
+    {
+     "type": "text",
+     "text": "            ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "℃。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "它在"
+    },
+    {
+     "type": "text",
+     "text": "            ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "温度附近误差很小，可以当作刻度正确的温度计使用? "
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "这支温度计的示数何时比真实值大，何时比真实值小?"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 4
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "                                                                               ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "答案：（1）",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "4.8℃   （2）25℃   （3）温度计示数小于25℃时，示数比真实值小；温度计示数大于25℃时，示数比真实值大",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【详解】（1）由题意知用此温度计上的104个刻度表示100℃，则温度计上的一个刻度表示的温度值为",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "℃。示数为",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "6℃时，其刻度线在零刻度线（",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "1℃）下有5个刻度，因此其实际温度为零下温度值，为",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "5×",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "℃≈4.8℃。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "（2）可以当作刻度正确的温度计使用时，设此时的刻度值为t，则满足以下关系：",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "（",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "t",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "（",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "1）",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "）",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "×",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "=t，解得t=25℃。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "（3）示数为",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "－",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "1℃时，真实值为0℃；示数为103℃时，真实值为100℃，又因为在温度计示数为25℃时，与实际温度相等，所以可知温度计示数小于25℃时，示数比真实值小；温度计示数大于25℃时，示数比真实值大。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 3
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": " 模块二：习题精练 ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FFFFFF"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 4
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "知识点  温度计及其使用",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "关于温度计的使用方法，下列说法正确的是"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A.温度计插入被测液体后，应立即读数，视线与液柱上表面相平"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "B.测量液体温度时，温度计应紧贴容器的底部或侧部"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "C.使用体温计之前应先把体温计直管中的液体甩到玻璃泡里"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "D.使用温度计前不用观察它的量程直接测量即可"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】C",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "温度计插入被测液体后，应等示数稳定后再读数，A项错误；使用温度计测量液体温度时，温度计应悬在被测液体中，不应接触容器侧壁或容器底，B项错误；由于体温计在构造和使用上与实验用的温度计不同，因此在使用体温计之前应先把体温计直管中的液体甩到玻璃泡里，C项正确；测量液体温度时应估计待测液体温度，选取量程适当的温度计，D项错误。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "在物理课上，小明同学测量烧杯中热水的温度时，将很少的热水倒入另一烧杯中，然后像如图所示的那样去测量和读数，他这样做被小刚找出了一些错误，但有一条找得不对，请你把它挑出来"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/bebbe04e79be4b0e97e9bbc63f3447a2.png",
+    "width": 141,
+    "height": 105
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A.不应该倒入另一烧杯，这会使水的温度降低"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "B.水倒得太少，温度计的玻璃泡不能浸没"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "C.读数时，视线应该与刻度线相平，而不应斜视"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "D.应该将温度计取出读数，而不应该放在水中读数"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】D",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "使用温度计测量液体温度时，温度计应停留在被测液体中，不应该将温度计取出读数，D项说法错误，其余各项中的说法均正确。 ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "（"
+    },
+    {
+     "type": "text",
+     "text": "2024杭州期中"
+    },
+    {
+     "type": "text",
+     "text": "）"
+    },
+    {
+     "type": "text",
+     "text": "小科将示数为37℃的体温计插入冰水混合物"
+    },
+    {
+     "type": "text",
+     "text": "（"
+    },
+    {
+     "type": "text",
+     "text": "1标准大气压下"
+    },
+    {
+     "type": "text",
+     "text": "）"
+    },
+    {
+     "type": "text",
+     "text": "中，体温计的示数是"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A.0℃   "
+    },
+    {
+     "type": "text",
+     "text": "     "
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "    "
+    },
+    {
+     "type": "text",
+     "text": "B.35℃   "
+    },
+    {
+     "type": "text",
+     "text": "       "
+    },
+    {
+     "type": "text",
+     "text": " C.37℃   "
+    },
+    {
+     "type": "text",
+     "text": "       "
+    },
+    {
+     "type": "text",
+     "text": " D.温度太低，超出测量范围"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】C",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "体温计的玻璃泡上方有一个缩口，因此液柱不能自己流回玻璃泡，必须用力将液体甩回玻璃泡。当温度低于或等于体温计的示数时，液柱高度不变，还是显示原来的温度；当温度高于示数时，液柱升高，能够正确显示测量温度。标准大气压下冰水混合物的温度为0℃，远远低于体温计原来的示数37℃，因此体温计液柱的高度不变，体温计的示数仍然为37℃，故C符合题意，ABD不符合题意。故选C。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "如图所示是一支常见体温计及其横截面的示意图。根据图示，判断下列关于体温计特点的说法中错误的是"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A.该体温计使用前应先用酒精进行消毒"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "B.因为体温计中的液柱太细难以读数，所以读数时沿图中B方向观察更易读数"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "C.体温计的玻璃管很细，测量温度时比常用温度计更加精确"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "D.体温计的玻璃泡上方有一段很细的弯管，离开被测人体后水银柱不会回落"
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/92f7d464f1b14d4482c18c34674cd509.png",
+    "width": 440,
+    "height": 74
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】B",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "用体温计测量体温时，应先用酒精对其进行消毒，故A正确：体温计中圆弧形玻璃的作用相当于放大镜，能获得大而清晰的图像，所以沿题图中A方向观察更易读数，故B错误：体温计和常用温度计相比，前者玻璃管很细，而下端的玻璃泡很大，即使有微小的温度变化，玻璃管中水银上升的高度也会非常明显，所以可以测量得更加精确，故C正确：体温计的玻璃泡上方有一段很细的弯管，因此离开被测人体后水银柱不会回落，故D正确。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "如图是一支刻有100个均匀小格的温度计，若将此温度计插入正在熔化的冰水混合物中，液面下降到第30格，若将此温度计插入1个标准大气压下的沸水中，液面升到第80格，则此温度计第10格时的温度是"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/b33c90738abc4e50a88ee824ba446de3.png",
+    "width": 318,
+    "height": 77
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A．0℃"
+    },
+    {
+     "type": "text",
+     "text": "           "
+    },
+    {
+     "type": "text",
+     "text": "\t"
+    },
+    {
+     "type": "text",
+     "text": "B．"
+    },
+    {
+     "type": "text",
+     "text": "－"
+    },
+    {
+     "type": "text",
+     "text": "20℃"
+    },
+    {
+     "type": "text",
+     "text": "\t"
+    },
+    {
+     "type": "text",
+     "text": "           "
+    },
+    {
+     "type": "text",
+     "text": "C．20℃"
+    },
+    {
+     "type": "text",
+     "text": "\t"
+    },
+    {
+     "type": "text",
+     "text": "            "
+    },
+    {
+     "type": "text",
+     "text": "D．"
+    },
+    {
+     "type": "text",
+     "text": "－"
+    },
+    {
+     "type": "text",
+     "text": "40℃"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "D",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】根据题意，将此温度计插入正在熔化的冰水混合物中，液面下降到第30格，将此温度计插入1个标准大气压下的沸水中，液面升到第80格，该温度计1格表示的温度为：",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "，此温度计第10格距离30格差20格，且温度在0℃以下，则表示的温度为：－2℃/格×20格＝－40℃℃，故D符合题意，ABC不符合题意。故选D",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 4
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "易错点  不明确体温计未甩时的测量原理",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "小"
+    },
+    {
+     "type": "text",
+     "text": "科"
+    },
+    {
+     "type": "text",
+     "text": "感觉自己发烧了，用体温计测量体温，结果为38.5℃，疑惑片刻后他用力甩了甩体温计，再次测量，结果为37.8℃，小"
+    },
+    {
+     "type": "text",
+     "text": "科"
+    },
+    {
+     "type": "text",
+     "text": "的体温是"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A.37.8℃   "
+    },
+    {
+     "type": "text",
+     "text": "       "
+    },
+    {
+     "type": "text",
+     "text": "B.38.5℃  "
+    },
+    {
+     "type": "text",
+     "text": "       "
+    },
+    {
+     "type": "text",
+     "text": " C.不超过37.8℃ "
+    },
+    {
+     "type": "text",
+     "text": "       "
+    },
+    {
+     "type": "text",
+     "text": "  D.在37.8℃和38.5℃之间"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】A",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "小",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "科",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "用体温计测量体温，结果为38.5℃，之后小",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "科",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "又用力甩了甩体温计，此时玻璃泡上方的水银回到玻璃泡中，此时测量体温才准确，再次测量结果为37.8℃，即小",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "科",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "的体温为37.8℃。故选A。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 3
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": " 模块三：巩固提升 "
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "测量是一个把待测的量与公认的标准进行比较的过程。下列实验过程中没有用到这一科学原理的是"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A.用直尺测出某物体的长度    "
+    },
+    {
+     "type": "text",
+     "text": "            "
+    },
+    {
+     "type": "text",
+     "text": "B.用停表测量百米赛跑的时间"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "C.用体温计测量人的体温      "
+    },
+    {
+     "type": "text",
+     "text": "            "
+    },
+    {
+     "type": "text",
+     "text": "D.用耳朵辨别钢琴与长笛的声音"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】D",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "用直尺测量物体的长度是通过物体长度与直尺刻度的比较得出测量值，A项不符合题意；用停表测量时间是通过赛跑时间与停表指针位置变化的比较得出测量值，B项不符合题 意；用体温计测量人的体温是通过人的体温与体温表中液柱的升降的比较得出的测量值，C项不符合题意；用耳朵辨别钢琴与长笛的声音靠的是人的听觉，不是测量过程，D项符合题意。本题应选D。 ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "（"
+    },
+    {
+     "type": "text",
+     "text": "2023杭州期中"
+    },
+    {
+     "type": "text",
+     "text": "）"
+    },
+    {
+     "type": "text",
+     "text": "关于温度计的使用，下列说法中正确的是"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A.所有温度计在使用前都要将液体甩回玻璃泡"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "B.测量液体温度时，温度计可以接触容器壁"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "C.待温度计示数稳定后再读数"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "D.酒精的凝固点是"
+    },
+    {
+     "type": "text",
+     "text": "－"
+    },
+    {
+     "type": "text",
+     "text": "117.3℃，南极的最低温度约为"
+    },
+    {
+     "type": "text",
+     "text": "－"
+    },
+    {
+     "type": "text",
+     "text": "89℃，去南极考察不能带酒精温度计"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】C",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "普通温度计在使用前不需要将液体甩回玻璃泡，故A错误；测量液体温度时，温度计不可以接触容器壁，故B错误；要待温度计示数稳定后再读数，故C正确；酒精的凝固点低于南极的最低温度，去南极考察可以带酒精温度计，故D错误。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "（"
+    },
+    {
+     "type": "text",
+     "text": "2024衢州期中"
+    },
+    {
+     "type": "text",
+     "text": "）"
+    },
+    {
+     "type": "text",
+     "text": "梅雨时节，天气多变，小科利用气温计对气温变化进行研究。如图是某天上午8：00小科观察到的气温计内液面位置，其读数为"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/32e4b956e0b44f2392be4336b37166a6.png",
+    "width": 132,
+    "height": 130
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A.20.5℃  "
+    },
+    {
+     "type": "text",
+     "text": "     "
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "   "
+    },
+    {
+     "type": "text",
+     "text": "B.25℃  "
+    },
+    {
+     "type": "text",
+     "text": "         "
+    },
+    {
+     "type": "text",
+     "text": "C.30.5℃  "
+    },
+    {
+     "type": "text",
+     "text": "    "
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "   "
+    },
+    {
+     "type": "text",
+     "text": "D.35℃"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】B",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "根据题图知道，气温计的分度值为1℃，由于刻度向上增大，所以，实际温度在0℃以上，故示数为25℃，故B正确。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "有一支刻度不清的温度计，将其玻璃泡插入冰水混合物时液柱的长度为2.5厘米；插入1标准大气压下的沸水中时液柱的长度为17.5厘米。当它的玻璃泡插入某液体中时，发现其液柱长度为5.5厘米，则被测液体的温度为"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A.20℃  "
+    },
+    {
+     "type": "text",
+     "text": "       "
+    },
+    {
+     "type": "text",
+     "text": "  "
+    },
+    {
+     "type": "text",
+     "text": "       "
+    },
+    {
+     "type": "text",
+     "text": "B.37℃   "
+    },
+    {
+     "type": "text",
+     "text": "          "
+    },
+    {
+     "type": "text",
+     "text": " C.50℃   "
+    },
+    {
+     "type": "text",
+     "text": "          "
+    },
+    {
+     "type": "text",
+     "text": " D.33℃"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "A",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "由题意知，0℃时液柱长度为2.5厘米、100℃时液柱长度为17.5厘米，则0℃～100℃的温度范围对应着15厘米的液柱长度。当在某温度下液柱长度为5.5厘米，液柱长度比0℃时多出3厘米，则对应的温度数为",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "℃=20℃。本题应选A。 ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "（2024柯桥联盟）"
+    },
+    {
+     "type": "text",
+     "text": "将一支普通温度计和一支示数为37℃的体温计放在窗台同一位置，记录一天中温度计示数T随时间t的变化情况并绘成图像，下列图像可能正确的是"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A．",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#333333"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "  ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#333333"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "B．",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#333333"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "  ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#333333"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "C．",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#333333"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "  ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#333333"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "D．",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#333333"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/d1029479464b47ff9dea5d3a6feeab01.png",
+    "width": 105,
+    "height": 103
+   }
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/2f3a04487b79477d9bc2733be36b1d2f.png",
+    "width": 106,
+    "height": 104
+   }
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/5905a12ba07e4ebeb8e9f5a06d37d1d4.png",
+    "width": 107,
+    "height": 104
+   }
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/fb20cdd8b6544ae1b357d360044028ed.png",
+    "width": 186,
+    "height": 88
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】A",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】BD、从早到晚一天中气温变化是先升高，再降低，普通温度计放在窗台上，其示数变化是先升高后降低，体温计的示数只上升不下降，BD错误",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "；",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "A.体温计原来的示数为37℃，若气温低于37℃，则体温计示数不变，A正确",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "；",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "C.体温计原来的示数为37℃，若气温高于37℃，则体温计示数会在37℃的基础上上升，C错误。故选A。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "小明同学洗澡时，有一个习惯总喜欢先用手去试一下水是否很烫，一次他把洗澡水冲到身上时，感觉不冷不热，则你认为小明这次洗澡的洗澡水最有可能的温度是"
+    },
+    {
+     "type": "text",
+     "text": "（       ）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A.55℃  "
+    },
+    {
+     "type": "text",
+     "text": "           "
+    },
+    {
+     "type": "text",
+     "text": " B.45℃   "
+    },
+    {
+     "type": "text",
+     "text": "          "
+    },
+    {
+     "type": "text",
+     "text": "C.35℃  "
+    },
+    {
+     "type": "text",
+     "text": "        "
+    },
+    {
+     "type": "text",
+     "text": " D.25℃"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】C",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "小明把洗澡水冲到身上时，感觉不冷不热，说明该洗澡水的温度跟体温非常接近，本题应选C。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "（"
+    },
+    {
+     "type": "text",
+     "text": "2023"
+    },
+    {
+     "type": "text",
+     "text": "余姚"
+    },
+    {
+     "type": "text",
+     "text": "期中"
+    },
+    {
+     "type": "text",
+     "text": "）"
+    },
+    {
+     "type": "text",
+     "text": "某同学用体温计给一位生病的同学量体温，结果读数为38.6℃，该同学在未甩的情况下，又用该温度计分别给生病的甲、乙、丙三位同学测量体温，测得结果：甲为38.6℃，乙为39.6℃，丙为39.6℃，则（　　）"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A．只有甲的正确"
+    },
+    {
+     "type": "text",
+     "text": "                    "
+    },
+    {
+     "type": "text",
+     "text": "B．只有乙的正确"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "C．只有丙的正确"
+    },
+    {
+     "type": "text",
+     "text": "                    "
+    },
+    {
+     "type": "text",
+     "text": "D．乙肯定正确，甲和丙也可能正确"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】D",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】由于体温计的构造特别，所以如果使用前不甩的话，温度计只能准确测量出等于或高于38.6℃的体温。所以用读数为38.6℃的体温计在未甩的情况下测量甲的体温，若甲的体温等于或低于38.6℃，测量结果均为38.6℃，所以甲有可能正确",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "；",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "测量乙的体温为39.6℃，乙的体温高于38.6°C所以乙的肯定正确",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "；",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "若丙的体温等于或低于39.6℃，测量结果均为39.6℃，所以丙有可能正确，故D符合题意，ABC不符合题意故选D。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "体温计不同于普通温度计，其最小刻度可"
+    },
+    {
+     "type": "text",
+     "text": "以"
+    },
+    {
+     "type": "text",
+     "text": "达到0.1℃，这是因为体温计在结构上有"
+    },
+    {
+     "type": "text",
+     "text": "："
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "                             ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "特点。小红老师使用体温计测得自己女儿的体温是37.2℃，然后就直接去测自己的体温，读数是一样的，则小红老师的体温该是"
+    },
+    {
+     "type": "text",
+     "text": "        ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "37.2℃。"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】玻璃管内径细 ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "≤",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "体温计的玻璃管内径很细，玻璃泡中的水银的体积变化会在玻璃管中发生明显的升降，因而体温计的分度值更小，测量更精确；体温计在第二次使用前要先甩一甩，若忘记甩而直接去测体温，则只能测出高于当前示数的体温，而测量不出低于当前示数的体温。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "温度计是实验室常用的工具，它是根据液体的原理制成的。根据图所示测量液体温度的操作情况，提出使用温度计注意事项中的两项："
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "①"
+    },
+    {
+     "type": "text",
+     "text": "                                                          ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "；"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "②"
+    },
+    {
+     "type": "text",
+     "text": "                                                          ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。"
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/0959736406fb4faeb43ea40f36c41bdc.png",
+    "width": 393,
+    "height": 178
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】热胀冷缩   ①使用温度计时，液泡要浸没在被测液体中   ②视线要与内液面上相平   ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "常用温度计是根据液体的热胀冷缩原理制成的；①读数时，玻璃泡要继续留在被测液体中；②视线与温度计内液面相平。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "（"
+    },
+    {
+     "type": "text",
+     "text": "2024绍初"
+    },
+    {
+     "type": "text",
+     "text": "）"
+    },
+    {
+     "type": "text",
+     "text": "如图甲为人们常用的体温计，是根据液体的"
+    },
+    {
+     "type": "text",
+     "text": "          ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "     ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "性质制成的，世界上第一支伽利略气体温度计（如图乙所示）也是根据气体的这种性质制成的，球形容器内是空气，下方的容器里盛的是水，若发现液面由A上升到B，则表明气温"
+    },
+    {
+     "type": "text",
+     "text": "          ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "（填"
+    },
+    {
+     "type": "text",
+     "text": "“"
+    },
+    {
+     "type": "text",
+     "text": "升高"
+    },
+    {
+     "type": "text",
+     "text": "”"
+    },
+    {
+     "type": "text",
+     "text": "或"
+    },
+    {
+     "type": "text",
+     "text": "“"
+    },
+    {
+     "type": "text",
+     "text": "降低"
+    },
+    {
+     "type": "text",
+     "text": "”"
+    },
+    {
+     "type": "text",
+     "text": "）。如图丙所示为小明仿照实验室使用的液体温度计的原理设计的一个简易气体温度计，烧瓶中装的是气体，瓶塞密封不漏气，瓶塞上面的细弯管中有一段液柱，若周围温度升高，则液柱将向"
+    },
+    {
+     "type": "text",
+     "text": "          ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "（填"
+    },
+    {
+     "type": "text",
+     "text": "“"
+    },
+    {
+     "type": "text",
+     "text": "左"
+    },
+    {
+     "type": "text",
+     "text": "”"
+    },
+    {
+     "type": "text",
+     "text": "或"
+    },
+    {
+     "type": "text",
+     "text": "“"
+    },
+    {
+     "type": "text",
+     "text": "右"
+    },
+    {
+     "type": "text",
+     "text": "”"
+    },
+    {
+     "type": "text",
+     "text": "）边移动。"
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://ai-book.oss-cn-hangzhou.aliyuncs.com/2026/07/02/57ad2c5d027c4be1bcb2c76e25646a7d.png",
+    "width": 586,
+    "height": 117
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": " ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【答案】热胀冷缩",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "；",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "降低",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "；",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "左",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】[1]人们常用的体温计是液体温度计，液体温度计是根据液体的热胀冷缩性质制成的。[2]已知世界上第一支伽利路气体温度计(如图乙所示)也是根据气体的热胀冷缩性质制成的，液面由4上升到B位置，球形容器内气体收缩，说明球内气体温度降低了，则表明此温度计周围的温度降低了。[3]当周围温度升高时，图丙中容器内的气体膨胀，液柱将向左移动",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "对知识进行归纳总结，这是一种很好的学习方法。下列是小科同学整理的"
+    },
+    {
+     "type": "text",
+     "text": "“"
+    },
+    {
+     "type": "text",
+     "text": "错误操作"
+    },
+    {
+     "type": "text",
+     "text": "”"
+    },
+    {
+     "type": "text",
+     "text": "，请你写出对应测量结果是偏大还是偏小。"
+    }
+   ]
+  },
+  {
+   "type": "table",
+   "content": [
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "选项"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "错误操作"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "测量结果"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "A"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "用拉得很紧的皮卷尺去测量某同学的跳远距离"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "           ",
+           "marks": [
+            {
+             "type": "textStyle",
+             "attrs": {
+              "color": "#FF0000"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "B"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "在测量头发的直径时，如果把头发绕在铅笔上时没有排列紧密"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "           ",
+           "marks": [
+            {
+             "type": "textStyle",
+             "attrs": {
+              "color": "#FF0000"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "C"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "用温度计测沸水温度时，将温度计移出沸水读数"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "           ",
+           "marks": [
+            {
+             "type": "textStyle",
+             "attrs": {
+              "color": "#FF0000"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "D"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "用量筒测量液体体积时俯视读数"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "           ",
+           "marks": [
+            {
+             "type": "textStyle",
+             "attrs": {
+              "color": "#FF0000"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "【答案】 偏小   偏大   偏小   偏大",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#0000FF"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " ",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "【详解】",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "A：用拉得很紧的皮卷尺去测量某同学的跳远距离，会使皮卷尺比实际长度长，使测量结果偏小。B：在测量头发的直径时，如果把头发绕在铅笔上时没有排列紧密，则会使测量结果偏大。C：用温度计测沸水温度时，将温度计移出沸水读数，温度计的示数会随之下降，使测量结果偏小。D：用量筒测量液体体积时俯视读数，会使读数偏大。",
+     "marks": [
+      {
+       "type": "textStyle",
+       "attrs": {
+        "color": "#FF0000"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

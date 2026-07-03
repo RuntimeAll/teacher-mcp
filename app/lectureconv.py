@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """讲义确定性转换（单一事实源，PRD-C-210）—— docx→Tiptap忠实内容 / 切片成挂KG片段 / 里外目录对齐闸。
 
-从 PRD-C-207 scratchpad 三零件逐行上提（行为等价，见 .lecture_work/parts_from_207/）：
+从 PRD-C-207 scratchpad 三零件逐行上提（行为等价，溯源零件见 reference_207/）：
   · docx_to_tiptap_faithful.py → faithful_content()：段落样式→heading/paragraph(留 bold/italic/color mark)、
      表格 w:shd 底纹→背景色、单元格内图、EMF/WMF 矢量图跳过、图尺寸 EMU→px clamp。
   · v0_migrate.py           → split_frags()：H2 折进组首 H3、H3→知识点片段、普通节点归 cur_kp 或课时L4。
