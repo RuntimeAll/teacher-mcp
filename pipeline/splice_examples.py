@@ -84,6 +84,11 @@ async def main():
             by_kp = {}
             for e in examples:
                 by_kp.setdefault(e["kp_subjectId"], []).append(e)
+                # 例题跨片段散落：extra_ranges = 其他片段里的孤儿答案/详解节点段——只删不插 kgExample
+                for ex in e.get("extra_ranges", []) or []:
+                    by_kp.setdefault(ex["kp_subjectId"], []).append(
+                        {"kp_subjectId": ex["kp_subjectId"], "node_start": ex["node_start"],
+                         "node_end": ex["node_end"], "delete_only": True})
 
             # 读当前讲解片段 content（DB，已是 ossUrl 图），splice
             cn = db.conn()
@@ -112,16 +117,19 @@ async def main():
                             kept_runs = nodes[i].get("content", [])[:kpr]
                             if kept_runs:
                                 new_nodes.append({"type": "paragraph", "content": kept_runs})
-                        new_nodes.append({"type": "kgExample",
-                                          "attrs": {"qid": str(sp["qid"]), "knowledgeId": sid}})
+                        if not sp.get("delete_only"):
+                            new_nodes.append({"type": "kgExample",
+                                              "attrs": {"qid": str(sp["qid"]), "knowledgeId": sid}})
                         i = sp["node_end"] + 1
                         si += 1
                     else:
                         new_nodes.append(nodes[i])
                         i += 1
+                n_kge = sum(1 for s in spans if not s.get("delete_only"))
+                n_del = sum(1 for s in spans if s.get("delete_only"))
                 spliced.append({"subjectId": sid, "title": title,
                                 "contentJson": {"type": "doc", "content": new_nodes}})
-                print(f"  [{sid}] «{title}» 原{len(nodes)}节点 → {len(new_nodes)}节点, 插 {len(spans)} 个 kgExample")
+                print(f"  [{sid}] «{title}» 原{len(nodes)}节点 → {len(new_nodes)}节点, 插 {n_kge} kgExample, 删孤儿段 {n_del}")
 
             save = _unwrap(await session.call_tool("save_lecture_frag",
                                                    {"frags": spliced, "book_id": BOOK_ID}))

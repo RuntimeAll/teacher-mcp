@@ -54,30 +54,63 @@ def _para_images(p):
     return out
 
 
-# ── run → Tiptap text node（保留 bold/italic/color mark） ──
-def _runs_to_text(p):
-    nodes = []
-    for run in p.runs:
-        t = run.text
-        if not t:
-            continue
-        marks = []
-        if run.bold:
-            marks.append({"type": "bold"})
-        if run.italic:
-            marks.append({"type": "italic"})
+# ── run → Tiptap text node（保留 bold/italic/color mark）+ 行内 OMML→$LaTeX$ ──
+_M_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
+
+
+def _omml_latex(om):
+    """OMML 元素 → $LaTeX$ 文本（复用 docconv 的 dwml 转换）。转不动时退纯文本，绝不静默丢。"""
+    from app.docconv import _to_latex
+
+    latex = (_to_latex(om) or "").strip()
+    if latex and not latex.startswith("?"):
+        return f"${latex}$"
+    # dwml 转不动 → 至少把 m:t 文本捞出来（比丢了强）
+    txt = "".join(t.text or "" for t in om.iter(_M_NS + "t"))
+    return txt
+
+
+def _run_node(run):
+    t = run.text
+    if not t:
+        return None
+    marks = []
+    if run.bold:
+        marks.append({"type": "bold"})
+    if run.italic:
+        marks.append({"type": "italic"})
+    col = None
+    try:
+        if run.font.color and run.font.color.rgb:
+            col = "#" + str(run.font.color.rgb)
+    except Exception:
         col = None
-        try:
-            if run.font.color and run.font.color.rgb:
-                col = "#" + str(run.font.color.rgb)
-        except Exception:
-            col = None
-        if col and col.lower() not in ("#000000", "#null", "#none"):
-            marks.append({"type": "textStyle", "attrs": {"color": col}})
-        node = {"type": "text", "text": t}
-        if marks:
-            node["marks"] = marks
-        nodes.append(node)
+    if col and col.lower() not in ("#000000", "#null", "#none"):
+        marks.append({"type": "textStyle", "attrs": {"color": col}})
+    node = {"type": "text", "text": t}
+    if marks:
+        node["marks"] = marks
+    return node
+
+
+def _runs_to_text(p):
+    """按段落 XML 顺序出 text 节点：w:r 照常（marks），m:oMath/oMathPara → $LaTeX$ 文本。
+    🔴 原版用 p.runs 会静默丢 OMML 公式（1.3 水火箭 ⅓ 教训，1.2.1/1.2.2 各丢 4/5 处）。"""
+    from docx.text.run import Run
+
+    nodes = []
+    for child in p._p.iterchildren():
+        tag = child.tag
+        if tag == qn("w:r"):
+            node = _run_node(Run(child, p))
+            if node:
+                nodes.append(node)
+        elif tag in (_M_NS + "oMath", _M_NS + "oMathPara"):
+            oms = [child] if tag == _M_NS + "oMath" else child.findall(_M_NS + "oMath")
+            for om in oms:
+                tx = _omml_latex(om)
+                if tx:
+                    nodes.append({"type": "text", "text": tx})
     return nodes
 
 
