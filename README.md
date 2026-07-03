@@ -40,6 +40,8 @@
 
 **多模态拆题铁律**（PRD §11）：读图拆出的题，**你自己逐题核对题数 + 抽查题面**再入库；分批时主 agent 汇总核对。位置序号（items 数组下标+1）= 入库 sort，别依赖原卷题号（遇杂散「N.」会错位）。
 
+**灌库收尾铁律**：每灌完一卷/一批，跑 `verify_ingest(paper_id=...)` 验证题干来源前缀残留=0（ingest_items 已自动剥，但验证不可省）。
+
 ---
 
 # 工具集（Claude ↔ 平台契约）
@@ -64,7 +66,9 @@
 | `format_question(question_type, stem, options?)` | markdown→blockJson（三端渲染，底座永不抛） |
 | `upload_image(local_path, asset_kind?)` | 本地图直传 OSS+去重，返回 ossUrl |
 | `ingest_question(...)` | 录单题（低层，多数场景用 `ingest_items` 代替） |
-| 🔴 `ingest_items(items, subject_root, paper?)` | **统一入库口**：一次完成 题+图+知识点关系+打标字段+可选成卷。契约见下 |
+| 🔴 `ingest_items(items, subject_root, paper?)` | **统一入库口**：一次完成 题+图+知识点关系+打标字段+可选成卷。契约见下。内置**自动剥题干来源前缀**（剥下的进 source_raw，warnings 报告） |
+| 🔴 `verify_ingest(paper_id? / question_ids?)` | **灌库后铁律验证**：题干来源前缀残留检查，每次灌完卷/批必跑，`residue_count` 必须=0 |
+| `get_role_manual()` | 取本说明书全文（协议内自带；另有 MCP resource `teacher://manual/ingest-role`）——fresh agent 先调它 |
 
 ## 打标 / 组卷
 | 工具 | 作用 |
@@ -94,6 +98,9 @@
   "secondary_kps": [],
   "difficult": 2,                          // 1基础/2中等/3较难/4压轴；null=占位2留给打标
   "err": ["计算失误"],                     // 易错点（受控7词：概念混淆/计算失误/审题偏差/隐含遗漏/分类不全/表达不规范/思路缺失）→ 越词表自动剔除+warning
+  //   🔴 口径说明：轻打标的 err 落 biz_question_ai.breakthrough_points（沿七上 sync_label 惯例）；
+  //   深打标 label_question 另有 hard_points(难点)/breakthrough_points(突破点) 两个语义字段——别混：
+  //   录入期只有 err（轻）；深打标补 DNA 时才区分难点/突破点。
   "why": "难度一句依据",                    // → biz_question_ai.difficulty_reason
   "models": [{"model_id": "TY07", "is_primary": 1}],      // 既有解法模型链
   "new_models": [{"name": "新模型名", "category": "…", "trigger_feature": "…", "action_conclusion": "…", "difficulty_tier": 2, "freq_band": 1}],  // 提议新模型(status=2待转正)

@@ -96,6 +96,36 @@ def set_difficulty_reason(question_id, why):
     return ok
 
 
+# ───────────────────────── ②b 前缀清洗残留检查（只读，灌库铁律验证端）─────────────────────────
+
+# 与 paperparse.SOURCE_PREFIX 同门控词（MySQL REGEXP/ICU 方言版；ASCII 方括号类在 ICU 转义诡异且中文卷罕见，
+# 检查端只盯 （(【 三种开头——Python 预防端 strip_source_prefix 仍全支持）
+_RESIDUE_REGEXP = ("^[（(【][^）)】]{1,40}(真题|中考|高考|会考|竞赛|模拟|期末|期中|月考|学年|"
+                   "单元测试|质检|调研|联考|检测|专题练习|假期作业|20[0-9]{2})")
+
+
+def find_prefix_residues(paper_id=None, question_ids=None, limit=50):
+    """查题干开头来源前缀残留（灌库后必验 REGEXP=0 铁律）。只读。返回 [{id, head}]。"""
+    c = conn()
+    with c.cursor() as cur:
+        if paper_id:
+            cur.execute(
+                "SELECT q.id, LEFT(q.stem_text, 50) FROM biz_question q"
+                " JOIN biz_paper_question pq ON pq.question_id=q.id AND pq.paper_id=%s"
+                " WHERE q.stem_text REGEXP %s LIMIT %s", (int(paper_id), _RESIDUE_REGEXP, int(limit)))
+        elif question_ids:
+            fmt = ",".join(["%s"] * len(question_ids))
+            cur.execute(
+                f"SELECT id, LEFT(stem_text, 50) FROM biz_question WHERE id IN ({fmt})"
+                " AND stem_text REGEXP %s LIMIT %s",
+                (*[int(q) for q in question_ids], _RESIDUE_REGEXP, int(limit)))
+        else:
+            return []
+        out = [{"id": r[0], "head": r[1]} for r in cur.fetchall()]
+    c.close()
+    return out
+
+
 # ───────────────────────── ③ 卷目录补设 ─────────────────────────
 
 def set_paper_subject(paper_id, category_id):
@@ -109,10 +139,33 @@ def set_paper_subject(paper_id, category_id):
 
 # ───────────────────────── ④ KG 只读查表 ─────────────────────────
 
+def _subseq(query, name):
+    """query 的字符是否按序散布于 name（「有理数乘法」⊂「有理数的乘法法则」）。LIKE 零命中时的兜底匹配。"""
+    it = iter(name)
+    return all(ch in it for ch in query)
+
+
 def kg_query(subject_root, query="", section_num="", parent_id="", leaves_only=False, limit=50):
     """biz_subject 只读查表（resolve_kg 底座）。
     🔴 叶子=无子节点（H2 实测：901 树 5 层、902-906 树 4 层，叶深不一，不得写死 level）。
+    query 先 LIKE 精配；**最终结果为空**（含 leaves_only 过滤后）自动退子序列匹配并合并
+    （治「有理数乘法」LIKE 只命中非叶「…乘法的运算律」、真叶「有理数的乘法法则」漏配——AC7 反馈）。
     返回 [{id,name,level,parent_id,is_leaf}]。"""
+    import re
+
+    def _filter_build(cur, rows):
+        if section_num:
+            rows = [r for r in rows if (m := re.match(r"^\s*(\d+\.\d+)\s+", r[1])) and m.group(1) == section_num]
+        ids = [r[0] for r in rows]
+        has_child = set()
+        if ids:
+            fmt = ",".join(["%s"] * len(ids))
+            cur.execute(f"SELECT DISTINCT CAST(parent_id AS CHAR) FROM biz_subject WHERE CAST(parent_id AS CHAR) IN ({fmt})", ids)
+            has_child = {r[0] for r in cur.fetchall()}
+        out = [{"id": i, "name": n, "level": lv, "parent_id": p, "is_leaf": i not in has_child}
+               for i, n, lv, p in rows]
+        return [x for x in out if x["is_leaf"]] if leaves_only else out
+
     c = conn()
     with c.cursor() as cur:
         conds, args = ["CAST(id AS CHAR) LIKE %s"], [str(subject_root) + "%"]
@@ -124,21 +177,15 @@ def kg_query(subject_root, query="", section_num="", parent_id="", leaves_only=F
         cur.execute(
             "SELECT CAST(id AS CHAR), name, level, CAST(parent_id AS CHAR) FROM biz_subject"
             f" WHERE {' AND '.join(conds)} ORDER BY id LIMIT %s", (*args, int(limit) * 4))
-        rows = cur.fetchall()
-        # section_num 精确节号过滤（如 '2.5' 命中「2.5 有理数的乘方」，防 LIKE 误配）
-        if section_num:
-            import re
-            rows = [r for r in rows if (m := re.match(r"^\s*(\d+\.\d+)\s+", r[1])) and m.group(1) == section_num]
-        # 叶子判定：一次查出本批 id 的子节点存在性
-        ids = [r[0] for r in rows]
-        has_child = set()
-        if ids:
-            fmt = ",".join(["%s"] * len(ids))
-            cur.execute(f"SELECT DISTINCT CAST(parent_id AS CHAR) FROM biz_subject WHERE CAST(parent_id AS CHAR) IN ({fmt})", ids)
-            has_child = {r[0] for r in cur.fetchall()}
+        out = _filter_build(cur, cur.fetchall())
+        if not out and query:
+            # LIKE 路线（含 leaves_only 过滤后）为空 → 拉全根子序列兜底（单树几百节点，内存筛便宜且确定性）
+            base_conds = ["parent_id=%s"] if parent_id else ["CAST(id AS CHAR) LIKE %s"]
+            base_args = [str(parent_id)] if parent_id else [str(subject_root) + "%"]
+            cur.execute(
+                "SELECT CAST(id AS CHAR), name, level, CAST(parent_id AS CHAR) FROM biz_subject"
+                f" WHERE {' AND '.join(base_conds)} ORDER BY id", base_args)
+            rows = [r for r in cur.fetchall() if _subseq(query, r[1])][: int(limit) * 4]
+            out = _filter_build(cur, rows)
     c.close()
-    out = [{"id": i, "name": n, "level": lv, "parent_id": p, "is_leaf": i not in has_child}
-           for i, n, lv, p in rows]
-    if leaves_only:
-        out = [x for x in out if x["is_leaf"]]
     return out[: int(limit)]

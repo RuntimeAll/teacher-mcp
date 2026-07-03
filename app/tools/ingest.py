@@ -13,7 +13,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.dicts import ANNO_ERROR, ANNO_SCENE
-from app.paperparse import FIG, FIG_IDS, dedup_key, infer_type, plain_text
+from app.paperparse import FIG, FIG_IDS, dedup_key, infer_type, plain_text, strip_source_prefix
 from app.ruoyi import RuoyiClient, RuoyiError
 from app.tools.compose import _standard_scores
 
@@ -278,6 +278,13 @@ def register(mcp, client: RuoyiClient) -> None:
             try:
                 stem_md, analyze_md, answer_md = it.stem, it.analyze, it.answer
                 opts_md = list(it.options or [])
+                source_raw = it.source_raw
+                # ── 前缀清洗（预防端，铁律「灌库后残留 REGEXP=0」）：剥题干开头来源前缀，剥下的进 source_raw ──
+                stem_md, stripped = strip_source_prefix(stem_md)
+                if stripped:
+                    warnings.append(f"已剥来源前缀「{stripped}」→ source_raw")
+                    if stripped not in source_raw:
+                        source_raw = f"{stripped} {source_raw}".strip()
                 images_meta: list[dict] = []
                 rid2oss: dict = {}      # convert_doc 〖图:rId〗 标记 → ossUrl
                 # ── 图：local_path 代传 OSS + 占位替换；ossUrl 直用 ──
@@ -356,7 +363,7 @@ def register(mcp, client: RuoyiClient) -> None:
                     exam_year=it.exam_year,
                     region_code=it.region_code,
                     source_type=it.source_type,
-                    source_raw=it.source_raw,
+                    source_raw=source_raw,
                     status="1",
                 )
                 if not ing.get("ok"):
@@ -467,3 +474,21 @@ def register(mcp, client: RuoyiClient) -> None:
         await client.teacher_post("/teacher/exam/paper/update", {
             "paperId": int(paper_id), "questions": questions, "suggestTime": int(suggest_time)})
         return f"建卷 paper_id={paper_id} 总分{int(sum(scores))} 时长{suggest_time}min"
+
+    @mcp.tool()
+    def verify_ingest(paper_id: int = 0, question_ids: list[int] = []) -> dict:
+        """🔴 灌库后铁律验证：检查题干开头来源前缀残留（如「（真题·杭州滨江）」「（2025 浙江期末）」）。
+
+        ingest_items 已内置预防端自动剥前缀；本工具是验证端——每次灌完卷/批必须跑一次，residue_count 必须=0。
+        参数: paper_id（查整卷题）或 question_ids（查指定题），二选一。
+        返回: {ok, residue_count, residues:[{id, head}]}；residue_count>0 = 清洗未过，逐题人工处置。
+        """
+        if not paper_id and not question_ids:
+            return {"ok": False, "reason": "paper_id 与 question_ids 至少给一个"}
+        from app import db
+        try:
+            residues = db.find_prefix_residues(paper_id=paper_id or None,
+                                               question_ids=question_ids or None)
+        except Exception as e:
+            return {"ok": False, "reason": f"{type(e).__name__}: {e}"}
+        return {"ok": True, "residue_count": len(residues), "residues": residues}

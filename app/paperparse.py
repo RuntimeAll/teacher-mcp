@@ -65,6 +65,21 @@ def derive_year(name):
     return m.group(1) if m else ""
 
 
+# 来源前缀（题干开头的「（真题·杭州滨江）」「（2025 浙江期末）」「【2024 中考】」类残留）——
+# 🔴 关键词门控保守剥离：括号段必须含来源词才剥，纯数学括号（如「(0°<α<180°)」不在开头也不含词）绝不误伤。
+_SRC_WORDS = r"(?:真题|中考|高考|会考|竞赛|模拟|期末|期中|月考|学年|单元测试|质检|调研|联考|检测|专题练习|假期作业|20\d{2})"
+SOURCE_PREFIX = re.compile(
+    r"^\s*(?:[（(【\[][^）)】\]]*" + _SRC_WORDS + r"[^）)】\]]*[）)】\]][·．.、\s]*)+")
+
+
+def strip_source_prefix(stem):
+    """剥题干开头的来源前缀。返回 (干净题干, 被剥内容或 '')。灌库前缀清洗铁律的预防端（防残留 REGEXP>0）。"""
+    m = SOURCE_PREFIX.match(stem or "")
+    if not m:
+        return stem, ""
+    return stem[m.end():].lstrip(), m.group(0).strip()
+
+
 def dedup_key(pure_stem, batch, num):
     """去重键 = 题干纯字符（判断标准 = biz_question.stem_text）。
     够长的真题干 → 作 external_key 传底座，底座 md5 存 stem_hash：题干已在 biz_question 则命中、

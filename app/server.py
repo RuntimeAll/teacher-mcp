@@ -20,6 +20,7 @@ from app.tools import convert as tool_convert
 from app.tools import ingest as tool_ingest
 from app.tools import kg as tool_kg
 from app.tools import label as tool_label
+from app.tools import manual as tool_manual
 
 mcp = FastMCP("teacher-mcp")
 
@@ -45,6 +46,7 @@ tool_compose.register(mcp, _client)     # compose_paper / create_paper / update_
 tool_ingest.register(mcp, _client)      # format/upload/ingest_question + 🔴ingest_items 统一入库口（写层·能力②录入，PRD-C-208）
 tool_label.register(mcp, _client)       # label_question（打标层·能力③ DNA 打标：难度/锚/解法骨架/变式底料）
 tool_convert.register(mcp, _client)     # convert_doc / convert_pdf / parse_paper_text（转换层·确定性预处理，PRD-C-208）
+tool_manual.register(mcp, _client)      # 角色说明书进协议：resource teacher://manual/ingest-role + get_role_manual 工具（B3）
 # 二期占位（同样「加一个 tools 目录 + register 一行」）：
 #   from app.tools import variants as tool_variants; tool_variants.register(mcp, _client)   # make_variants（举一反三）
 #   from app.tools import kgbuild as tool_kgbuild; tool_kgbuild.register(mcp, _client)       # build_kg
