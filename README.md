@@ -140,7 +140,7 @@ copy .env.example .env   # 填 RUOYI_USERNAME/RUOYI_PASSWORD + db_*（不入 git
 身份层(`tools/auth.py`) / 读层(`tools/kg.py`) / 转换层(`tools/convert.py`) / 写层(`tools/ingest.py`) / 组卷(`tools/compose.py`) / 打标(`tools/label.py`) 已分离。二期照样：新增 `app/tools/<name>.py` 写 `register(mcp, client)` + `app/server.py` 加一行。`login`/鉴权/底座调用层(`app/ruoyi.py`)不动。
 
 ## 架构落位（AC8 走查面）
-- **app/**（MCP server，零 LLM）：`server.py`(注册) · `ruoyi.py`(HTTP) · `config.py` · `dicts.py`(字典镜像) · `paperparse.py`(确定性拆题·单一事实源) · `docconv.py`(docx/pdf 转换) · `db.py`(🔴 pymysql 收口：模型链/难度依据/卷目录补设/KG只读查表，PRD 3.3-b) · `tools/`(工具面)。
+- **app/**（MCP server，零 LLM）：`server.py`(注册) · `ruoyi.py`(HTTP + 🔴多底座 `RuoyiCluster`：A=:8080 主底座/C=:8090 讲义懒登录，同库同账号 token 各持；toolkit=:8093 配置占位) · `config.py` · `dicts.py`(字典镜像) · `paperparse.py`(确定性拆题·单一事实源) · `docconv.py`(docx/pdf 转换) · `db.py`(🔴 pymysql 收口：模型链/难度依据/卷目录补设/KG只读查表，PRD 3.3-b) · `tools/`(工具面)。
 - **tools/**（本地管线脚本，薄）：`mcp_call.py`(通用运行器) · `ingest_paper.py`/`sync_ingest.py`/`run_paper.py`/`label_runner.py` 等（调 app/ 模块，逻辑已上提）。
 - 🔴 **技术债显式挂账**（3.3-b）：关系表 pymysql 是本地 Claude Code 服务态的过渡；对外开放（stdio→HTTP+鉴权）前必须 HTTP 化（A 线补端点，独立卡）。
 
