@@ -23,6 +23,7 @@ from app.tools import convert as tool_convert
 from app.tools import ingest as tool_ingest
 from app.tools import kg as tool_kg
 from app.tools import label as tool_label
+from app.tools import lecture as tool_lecture
 from app.tools import manual as tool_manual
 
 mcp = FastMCP("teacher-mcp")
@@ -50,10 +51,10 @@ tool_ingest.register(mcp, _cluster.a)     # format/upload/ingest_question + 🔴
 tool_label.register(mcp, _cluster.a)      # label_question（打标层·能力③ DNA 打标：难度/锚/解法骨架/变式底料）
 tool_convert.register(mcp, _cluster.a)    # convert_doc / convert_pdf / parse_paper_text（转换层·确定性预处理，PRD-C-208）
 tool_manual.register(mcp, _cluster.a)     # 角色说明书进协议：resource teacher://manual/ingest-role + get_role_manual 工具（B3）
+tool_lecture.register(mcp, _cluster)      # convert_lecture_docx（确定性转换）+ save_lecture_frag（写层·能力④讲义录入，PRD-C-210）🔴打 C 线 :8090=传 _cluster，工具内 ensure_c() 懒登录
 # 二期占位（同样「加一个 tools 目录 + register 一行」）：
 #   from app.tools import variants as tool_variants; tool_variants.register(mcp, _cluster.a)   # make_variants（举一反三）
 #   from app.tools import kgbuild as tool_kgbuild; tool_kgbuild.register(mcp, _cluster.a)       # build_kg
-#   讲义类工具接 C 线 = register 传 _cluster，工具内 await cluster.ensure_c() 后用 cluster.c
 
 
 def main() -> None:

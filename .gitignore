@@ -4,3 +4,8 @@ __pycache__/
 .env
 *.log
 .smoke_tree.json
+.lecture_work/
+.lecture_imgs/
+# 但保留从 207 scratchpad 抢救的转换器溯源零件（lectureconv.py 的移植正本）
+!.lecture_work/parts_from_207/
+!.lecture_work/parts_from_207/**

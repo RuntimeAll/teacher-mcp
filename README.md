@@ -120,6 +120,63 @@
 
 ---
 
+# 🎭 讲义录入角色说明书（PRD-C-210 · 录入角色的姊妹角色）
+
+**你的职责**：不管讲义从哪来、什么版式，把它录成**挂 KG 节点的讲义片段**（`biz_kg_lecture_frag`），维护者在 `/lecture-hub` 验收。与题目录入同一范式：**智能活（读文档、把讲解映射到知识点、判例题归属）你做；确定性活（忠实转换、切段、图占位、落库、去重）交给工具。**
+
+🔴 **三条铁律**（继承三位一体）：
+1. **例题零复制**：讲义里的例题**必须先走题目录入管线（`ingest_items`）拿 qid**，片段里只放 `kgExample(qid)` 节点，题面/答案不落片段。
+2. **片段挂 KG，不现造知识点**：每片段 `subjectId` = 真实 `biz_subject` 节点 id（知识点 L5 / 课时 L4）；知识点从 KG 来，不从讲义现编。
+3. **多底座**：讲义片段落 **C 线 :8090**（`save_lecture_frag` 内部 `ensure_c` 懒登录）；例题走题库落 **A 线 :8080**（`ingest_items`）——两套会话，`login` 一次记凭据、两底座各自持 token。
+
+## 路由矩阵（讲义来源 → 处理路径）
+
+| 来源 | 版式特征 | 路径 |
+|---|---|---|
+| **崔崔 docx（教师版/原卷版）** | 模块(H3)>分组(H3)>知识点(H4)，H3≠知识点 | `convert_lecture_docx(mode='assist')` 出忠实内容+分段+KG靶子 → **你理解式映射**：读 `raw_path` 全文，按 `kg_targets` 把模块一「知识精讲」的讲解重组成片段 IR（每片段 subjectId=知识点id）；习题模块的题走题库拿 qid |
+| **已清洗 docx（H3==知识点名）** | H3 就是 KG 知识点名 | `convert_lecture_docx(mode='auto')` 直接确定性切片 + 里外目录对齐闸 → 得 `ir_path` |
+| **扫描/图片讲义（PDF 无文字层）** | pymupdf 检不到文字层 | `convert_pdf` 转图（170dpi，208 H1b 路线）→ 你多模态读页、按 `kg_targets` 映射成片段 IR |
+| **预处理 JSON（片段 IR）** | 已是 §契约 结构 | 校验 subjectId 真实 → 直接 `save_lecture_frag` |
+| **新版式（必刷等教辅）** | 未见过 | 🔴 **先转 1-2 页样例、把「这段→哪个片段节点」映射摆给维护者确认**，对齐后才批量（PRD-C-210 §2：版式配方每套一份，先 pilot 再投产） |
+
+## 理解式映射流程（崔崔版式主路，端到端）
+
+1. `login(admin, ...)`（讲义官方库 owner=uid1；`save_lecture_frag` 省略 owner 即落官方库）。
+2. `convert_lecture_docx(docx_path, course_subject_id, mode='assist')` → 拿 `kg_targets`（该课时 10 个知识点）+ `sections`（顶层 H3 分段，看清模块一讲解 / 模块二三习题边界）+ `images`（图清单）+ `raw_path`（忠实全文）。
+3. **读 `raw_path`**，把「模块一·知识精讲」的讲解**按 kg_targets 重组成片段 IR**：`[{subjectId:知识点id, title:知识点名, contentJson:{type:doc,content:[...]}}]`。崔崔版式里知识点名恰在 H4，可按「H4 命中 KG 知识点名」切、污染 H4（如「零刻度线：…」）自然归入当前知识点。**覆盖校验：10 个知识点每个都要有片段**（缺则报告，别静默）。
+4. **习题模块**（模块二习题精练 / 模块三巩固提升）：每题走 `ingest_items` 录进题库拿 qid → 在对应知识点片段的 contentJson 里插 `{"type":"kgExample","attrs":{"qid":该qid,"knowledgeId":知识点id}}` 节点。
+5. **图**：`images[].local_path` 逐张 `upload_image` 拿 ossUrl，攒成 `image_map={rId: ossUrl}`。
+6. `save_lecture_frag(frags=你的片段IR, book_id, image_map=image_map)` → upsert 落 :8090；省略 owner=官方库覆盖（UK=subjectId+bookId+owner 幂等，重录=updated 不撞）。`unresolved_images` 报告没换成 OSS 的图（EMF/WMF 矢量图浏览器不支持，会被剔除）。
+7. **验收**：`GET /teacher/kg/lecture?subjectId=课时id&bookId=CC7S` 汇聚 H3 数==知识点数；`/lecture-hub` 点该课时看渲染（导图/讲解/例题卡/表格颜色忠实）。
+
+## 讲义工具集
+
+| 工具 | 作用 |
+|---|---|
+| `convert_lecture_docx(docx_path, course_subject_id, book_id?, batch?, mode?)` | 讲义 docx→忠实 Tiptap 内容+KG 知识点靶子+图清单。`mode='assist'`(默认，出原料给你理解式映射) / `'auto'`(H3==知识点的清洗源才用，直接确定性切片+对齐闸)。图出 `〖图:rId〗` 占位+rid |
+| 🔴 `save_lecture_frag(ir_path? / frags?, book_id?, image_map?, owner?, allow_toc_fail?)` | 片段 IR→C 线 :8090 upsert 入库（唯一入库口，幂等覆盖）。`image_map={rid:ossUrl}` 回填图；`__UNMATCHED__` 片段默认拦截（对齐闸）；省略 owner=登录者（admin=官方库） |
+
+> 复用题目录入的工具：`ingest_items`（例题/习题过题库拿 qid）、`upload_image`（图传 OSS）、`resolve_kg`（查知识点 id）、`format_question`。
+
+## 契约面板 —— 片段 IR（`save_lecture_frag` 入参）
+
+```jsonc
+// save_lecture_frag(frags: LectureFrag[], book_id, image_map?)
+{
+  "subjectId": "901001002001003",       // 挂载锚：真实 biz_subject 节点 id（知识点L5/课时L4）
+  "title": "长度的测量",                 // 默认取知识点名
+  "contentJson": {                       // Tiptap doc：讲解段/表(带背景色)/图(src=ossUrl)/kgExample(qid)/思维导图
+    "type": "doc",
+    "content": [ /* heading/paragraph(留 bold/color mark)/table/image/kgExample 节点 */ ]
+  },
+  "status": "0"                          // 0正常/1草稿
+}
+// owner 不传 = 登录者（admin→官方库）；返回 {ok, owner, results:[{subjectId, action:"created|updated"}], stats, unresolved_images}
+```
+**允容策略**：`subjectId` 必须真实存在于 biz_subject（BE 校验，不存在则该片段 fail）；`kgExample.qid` 必须在 biz_question；单片段失败不回滚整批。
+
+---
+
 # 跑 / 自检
 前置：平台 BE 在 `.env` 的 `RUOYI_BASE_URL`（默认 :8080，A 线录入 BE）在跑；MySQL :3307（dev 库 `ai_lesson_prep`）在跑。
 > ℹ️ `mcp_call.py` 已内置强制 stdout UTF-8，Windows 下无需再 set 环境变量即可正常输出中文/公式（含 `\xa0`）。若你另写脚本调工具，同样记得 `sys.stdout.reconfigure(encoding="utf-8")`。
@@ -137,10 +194,11 @@ copy .env.example .env   # 填 RUOYI_USERNAME/RUOYI_PASSWORD + db_*（不入 git
 ```
 
 ## 加能力 = 加一个目录（AC6 解耦）
-身份层(`tools/auth.py`) / 读层(`tools/kg.py`) / 转换层(`tools/convert.py`) / 写层(`tools/ingest.py`) / 组卷(`tools/compose.py`) / 打标(`tools/label.py`) 已分离。二期照样：新增 `app/tools/<name>.py` 写 `register(mcp, client)` + `app/server.py` 加一行。`login`/鉴权/底座调用层(`app/ruoyi.py`)不动。
+身份层(`tools/auth.py`) / 读层(`tools/kg.py`) / 转换层(`tools/convert.py`) / 写层(`tools/ingest.py`) / 组卷(`tools/compose.py`) / 打标(`tools/label.py`) / 讲义(`tools/lecture.py`) 已分离。二期照样：新增 `app/tools/<name>.py` 写 `register(mcp, client)` + `app/server.py` 加一行。`login`/鉴权/底座调用层(`app/ruoyi.py`)不动。
+> 🔴 讲义类工具走 C 线 :8090 = `register(mcp, cluster)` 传**整个 cluster**（非 `cluster.a`），工具内 `await cluster.ensure_c()` 懒登录后用；题目类工具传 `cluster.a`（A 线 :8080）。
 
 ## 架构落位（AC8 走查面）
-- **app/**（MCP server，零 LLM）：`server.py`(注册) · `ruoyi.py`(HTTP + 🔴多底座 `RuoyiCluster`：A=:8080 主底座/C=:8090 讲义懒登录，同库同账号 token 各持；toolkit=:8093 配置占位) · `config.py` · `dicts.py`(字典镜像) · `paperparse.py`(确定性拆题·单一事实源) · `docconv.py`(docx/pdf 转换) · `db.py`(🔴 pymysql 收口：模型链/难度依据/卷目录补设/KG只读查表，PRD 3.3-b) · `tools/`(工具面)。
+- **app/**（MCP server，零 LLM）：`server.py`(注册) · `ruoyi.py`(HTTP + 🔴多底座 `RuoyiCluster`：A=:8080 主底座/C=:8090 讲义懒登录，同库同账号 token 各持；toolkit=:8093 配置占位) · `config.py` · `dicts.py`(字典镜像) · `paperparse.py`(确定性拆题·单一事实源) · `docconv.py`(docx/pdf 转换) · `lectureconv.py`(🔴讲义忠实转换/切段/里外目录对齐闸·单一事实源，PRD-C-207 三零件上提) · `db.py`(🔴 pymysql 收口：模型链/难度依据/卷目录补设/KG只读查表，PRD 3.3-b) · `tools/`(工具面)。
 - **tools/**（本地管线脚本，薄）：`mcp_call.py`(通用运行器) · `ingest_paper.py`/`sync_ingest.py`/`run_paper.py`/`label_runner.py` 等（调 app/ 模块，逻辑已上提）。
 - 🔴 **技术债显式挂账**（3.3-b）：关系表 pymysql 是本地 Claude Code 服务态的过渡；对外开放（stdio→HTTP+鉴权）前必须 HTTP 化（A 线补端点，独立卡）。
 
