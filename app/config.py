@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     ruoyi_client_id: str = "e5cd7e4891bf95d1d19206ce24a7b32e"
     ruoyi_tenant_id: str = "000000"
 
+    # 多底座路由（同库同账号体系，token 互不通用 → 每底座各自登录）
+    ruoyi_c_base_url: str = "http://localhost:8090"  # C 线底座（讲义接口，后续卡用）
+    toolkit_base_url: str = "http://localhost:8093"  # toolkit（FastAPI 非 RuoYi）——占位，本期不实现 client
+
     # 真账号身份：正式由 login 工具传参；以下仅 login 不传参时兜底 + 冒烟用
     ruoyi_username: str = ""
     ruoyi_password: str = ""

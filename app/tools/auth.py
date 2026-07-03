@@ -4,10 +4,11 @@
 身份层与具体业务能力（组卷/举一反三/录入/KG）隔离：业务工具只隐式取会话身份，不重复登录逻辑。
 """
 from app.config import settings
-from app.ruoyi import RuoyiClient, RuoyiError
+from app.ruoyi import RuoyiCluster, RuoyiError
 
 
-def register(mcp, client: RuoyiClient) -> None:
+def register(mcp, cluster: RuoyiCluster) -> None:
+    # 🔴 auth 特殊：register 收 cluster（登 A 线 + 记凭据供 C 线懒登录）；其余业务工具仍收 cluster.a。
     @mcp.tool()
     async def login(username: str = "", password: str = "") -> dict:
         """以真实 teacher 账号登录平台，拿双头 token 注入本会话身份（后续所有工具隐式带该身份、落 RuoYi 权限审计）。
@@ -20,7 +21,7 @@ def register(mcp, client: RuoyiClient) -> None:
         u = username or settings.ruoyi_username
         p = password or settings.ruoyi_password
         try:
-            info = await client.login(u, p)
+            info = await cluster.login(u, p)
         except RuoyiError as e:
             return {"ok": False, "reason": str(e)}
         return {"ok": True, "teacher_id": info["user_id"], "username": info["username"]}

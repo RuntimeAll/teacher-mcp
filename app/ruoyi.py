@@ -26,12 +26,13 @@ class RuoyiClient:
     多 client/多会话的 token_ref 句柄隔离是后续卡的事；本期 stdio 单 client 单会话足够。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, base_url: str = "") -> None:
+        # base_url 空 = 沿用 settings.ruoyi_base_url（A 线主底座）；token/user_id/username 均实例级，各底座各持会话
         self._token: Optional[str] = None
         self._user_id: Optional[int] = None
         self._username: Optional[str] = None
         self._client = httpx.AsyncClient(
-            base_url=settings.ruoyi_base_url, timeout=60.0, trust_env=False
+            base_url=base_url or settings.ruoyi_base_url, timeout=60.0, trust_env=False
         )
 
     async def aclose(self) -> None:
@@ -133,3 +134,48 @@ class RuoyiClient:
     async def auto_generate(self, body: dict) -> Any:
         """确定性组卷接口。POST /teacher/paper/auto-generate。save=true+teacherId 才落库 biz_paper。"""
         return await self.teacher_post("/teacher/paper/auto-generate", body)
+
+
+class RuoyiCluster:
+    """多底座会话簇：A=:8080 主底座（现有全部工具打它）+ C=:8090（讲义接口，后续卡用）。
+
+    两 BE 同库同账号体系（sys_user 同表、同一套用户名密码），但 token 互不通用（两套
+    Sa-Token 会话）→ 每底座各自 login、各持 token。
+    - login(): 登 A 线并记住凭据（本地进程内明文即可）。
+    - ensure_c(): 首次需要 C 线时用记住的凭据对 C 线懒登录——C 线没起时不拖垮 A 线角色。
+    - toolkit :8093 是 FastAPI 非 RuoYi，仅 settings.toolkit_base_url 占位，本期不实现 client。
+    """
+
+    def __init__(self) -> None:
+        self.a = RuoyiClient()  # A 线主底座（settings.ruoyi_base_url，:8080）
+        self._c: Optional[RuoyiClient] = None  # C 线懒创建
+        self._username: Optional[str] = None
+        self._password: Optional[str] = None
+
+    @property
+    def c(self) -> RuoyiClient:
+        """C 线客户端（:8090，懒创建；会话需另经 ensure_c() 登录）。"""
+        if self._c is None:
+            self._c = RuoyiClient(base_url=settings.ruoyi_c_base_url)
+        return self._c
+
+    async def login(self, username: str, password: str) -> dict:
+        """登 A 线并记住凭据（供 C 线懒登录复用，同库同账号）。"""
+        info = await self.a.login(username, password)
+        self._username = username
+        self._password = password
+        return info
+
+    async def ensure_c(self) -> RuoyiClient:
+        """确保 C 线已登录（懒登录）：无会话则用记住的凭据对 C 线 login。"""
+        c = self.c
+        if not c.has_session():
+            if not self._username or not self._password:
+                raise RuoyiError("C 线懒登录失败：请先调 login（A 线登录时记住凭据）")
+            await c.login(self._username, self._password)
+        return c
+
+    async def aclose(self) -> None:
+        await self.a.aclose()
+        if self._c is not None:
+            await self._c.aclose()
