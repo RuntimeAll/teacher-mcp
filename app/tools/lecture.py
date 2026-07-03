@@ -144,12 +144,21 @@ def register(mcp, cluster: RuoyiCluster) -> None:
             ir_path = WORK / f"{name}_ir.json"
             ir_path.write_text(json.dumps({"book_id": book_id, "course_subject_id": course_subject_id,
                                            "frags": ir_frags}, ensure_ascii=False, indent=1), encoding="utf-8")
+            # 习题原始文本（模块二/三，带 〖图:rId〗+[H] 标记）→ 交解析 subagent 拆题绑点
+            ex_raw_path = None
+            if exercise_sections:
+                ex_start = exercise_sections[0]["start"]
+                ex_end = exercise_sections[-1]["end"]
+                ex_text = lectureconv.render_with_markers(content[ex_start:ex_end])
+                ex_raw_path = WORK / f"{name}_exercises_raw.txt"
+                ex_raw_path.write_text(ex_text, encoding="utf-8")
             coverage_ok = not missing
             return {"ok": True, "mode": "cuicui", "course": course, "frag_count": len(ir_frags),
                     "frags": summary, "coverage": {"kp_total": len(kg_targets), "covered": len(ir_frags),
                                                    "missing": missing, "verdict": "PASS" if coverage_ok else "FAIL"},
-                    "exercise_sections": exercise_sections, "images": images, "ir_path": str(ir_path), "stats": stats,
-                    "note": ("覆盖闸 PASS：讲解 10 片段就绪，上传图后 save_lecture_frag；习题走 exercise_sections→208 拿 qid 挂 kgExample"
+                    "exercise_sections": exercise_sections, "exercise_raw_path": str(ex_raw_path) if ex_raw_path else None,
+                    "kg_targets": kg_targets, "images": images, "ir_path": str(ir_path), "stats": stats,
+                    "note": ("覆盖闸 PASS：讲解 10 片段就绪，上传图后 save_lecture_frag；习题=exercise_raw_path 交解析 subagent 拆题绑点(kg_targets)→bulk ingest_items→qid→(可选)挂 kgExample"
                              if coverage_ok else f"🔴 覆盖闸 FAIL：知识点 {missing} 无讲解片段，人工核对（版式可能偏离崔崔标准）")}
 
         if mode == "auto":

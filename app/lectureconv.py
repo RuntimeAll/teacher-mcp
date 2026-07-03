@@ -203,6 +203,43 @@ def node_text(node):
     return "".join(node_text(c) for c in (node.get("content", []) or []))
 
 
+def render_with_markers(nodes):
+    """把节点渲成**带结构标记的纯文本**（供解析 subagent 拆题）：
+      · 图 → 〖图:rId〗 行内标记（与 208 约定一致，rid 对应 images 清单的本地图）
+      · heading → 行首 [H{level}] 前缀（分组头/知识点组标题，给拆题当 kp 线索）
+      · 段落/表格 → 逐块换行
+    一块一行，保留文档顺序，让 LLM 看得清题界与图位。"""
+    lines = []
+
+    def render(node):
+        t = node.get("type")
+        if t == "image":
+            rid = node.get("attrs", {}).get("rid")
+            return f"〖图:{rid}〗" if rid else "〖图〗"
+        if t == "text":
+            return node.get("text", "")
+        inner = "".join(render(c) for c in (node.get("content", []) or []))
+        return inner
+
+    for n in nodes:
+        t = n.get("type")
+        if t == "heading":
+            lv = n.get("attrs", {}).get("level", 0)
+            lines.append(f"[H{lv}] {render(n)}".rstrip())
+        elif t == "table":
+            # 表格逐行拼（｜分隔），题目里表格少见但保留
+            rows = []
+            for r in n.get("content", []):
+                cells = [render(c).strip() for c in r.get("content", [])]
+                rows.append(" ｜ ".join(cells))
+            lines.append("[表] " + " / ".join(rows))
+        else:
+            line = render(n)
+            if line.strip():
+                lines.append(line)
+    return "\n".join(lines)
+
+
 def _heading_texts(nodes, level=3):
     out = []
     for n in nodes:
