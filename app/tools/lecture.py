@@ -31,7 +31,7 @@ def _drop_unresolved_images(content, image_map):
         out = []
         for node in nodes:
             if isinstance(node, dict):
-                if node.get("type") == "image":
+                if node.get("type") in ("image", "inlineImage"):
                     attrs = node.get("attrs", {})
                     rid = attrs.get("rid")
                     url = (image_map or {}).get(rid) if rid else None

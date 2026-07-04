@@ -130,8 +130,9 @@ def _para_style_level(p):
 
 
 # ── 图片节点：出占位 src=〖图:rid〗 + 内容区 clamp 等比（上传由 agent 后置） ──
-def _image_node(rid, w, h, images):
-    """images: dict 累加 {rid: None}（local_path 由 extract_images 另填）；节点 src 出占位待回填。"""
+def _image_node(rid, w, h, images, inline=False):
+    """images: dict 累加 {rid: None}（local_path 由 extract_images 另填）；节点 src 出占位待回填。
+    inline=True → Umo inlineImage 节点（group=inline，横向流），用于「同段多图=一排」保留原版并排布局。"""
     images.setdefault(rid, None)
     attrs = {"src": IMG_PLACEHOLDER.format(rid=rid), "rid": rid}
     if w:
@@ -139,7 +140,20 @@ def _image_node(rid, w, h, images):
         attrs["width"] = cw
         if h:
             attrs["height"] = round(h * cw / w)
+    if inline:
+        attrs["inline"] = True
+        return {"type": "inlineImage", "attrs": attrs}
     return {"type": "image", "attrs": attrs}
+
+
+def _emit_para_images(rids, images):
+    """一个 docx 段落里的图 → 节点列表。
+    ≥2 张 = 原版一排 → 合成一个 paragraph 内多个 inlineImage（横向流，保留并排布局）；
+    单张 = block image（照旧竖直独占一行）。"""
+    if len(rids) >= 2:
+        kids = [_image_node(rid, w, h, images, inline=True) for rid, w, h in rids]
+        return [{"type": "paragraph", "content": kids}]
+    return [_image_node(rid, w, h, images) for rid, w, h in rids]
 
 
 # ── 单元格内容：段落文字 + 内嵌图片（按文档顺序） ──
@@ -149,8 +163,7 @@ def _cell_blocks(c, images):
         tn = _runs_to_text(cp) or ([{"type": "text", "text": cp.text}] if cp.text.strip() else [])
         if tn:
             blocks.append({"type": "paragraph", "content": tn})
-        for rid, w, h in _para_images(cp):
-            blocks.append(_image_node(rid, w, h, images))
+        blocks.extend(_emit_para_images(_para_images(cp), images))
     if not blocks:
         blocks = [{"type": "paragraph"}]
     return blocks
@@ -206,9 +219,9 @@ def faithful_content(docx_path):
             else:
                 content.append({"type": "paragraph", "content": tnodes})
                 n_para += 1
-        for rid, w, h in rids:
-            content.append(_image_node(rid, w, h, images))
-            n_img += 1
+        for node in _emit_para_images(rids, images):
+            content.append(node)
+        n_img += len(rids)
     stats = {"heading": n_head, "paragraph": n_para, "table": n_tbl, "image": n_img, "blocks": len(content)}
     return content, images, stats
 

@@ -45,7 +45,7 @@ def _collect_rids(frags):
 
     def w(n):
         if isinstance(n, dict):
-            if n.get("type") == "image":
+            if n.get("type") in ("image", "inlineImage"):
                 r = n.get("attrs", {}).get("rid")
                 if r:
                     rids.add(r)
