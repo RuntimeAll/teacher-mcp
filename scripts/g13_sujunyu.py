@@ -184,6 +184,21 @@ def _get(d: dict, *keys):
     return None
 
 
+def _tag_star_levels(qids20: list) -> None:
+    """fixture：给专项 20 题打 star_level（★7/★★8/★★★5，dev 库测试标注，见调用处注释）。"""
+    import pymysql
+    stars = ["1"] * 7 + ["2"] * 8 + ["3"] * 5
+    conn = pymysql.connect(host="127.0.0.1", port=3307, user="root", password="123456",
+                           database="ai_lesson_prep", charset="utf8mb4")
+    try:
+        with conn.cursor() as cur:
+            for qid, s in zip(qids20, stars):
+                cur.execute("UPDATE biz_question SET star_level=%s WHERE id=%s", (s, qid))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 async def _fetch_question_ids(client, need: int) -> list:
     """从既有端点 POST /teacher/question/page 取真实公开题 id（🔴 不编造 id）。"""
     ids: list = []
@@ -280,6 +295,11 @@ async def main() -> None:
     qids = await _fetch_question_ids(client, 31)
     step("4a.取 31 个真实题 id（/teacher/question/page）", len(qids) == 31,
          f"got={len(qids)} 首题id={qids[0] if qids else '-'}")
+    # fixture：专项 20 题按苏俊宇案例卷 DNA 打星级（★7/★★8/★★★5）。
+    # star_level 为 PRD-C-213 新列（dev 库、无其他消费者）；公开题原本无星级会全部归第一层，
+    # 导致 09b 三层结构无法复刻（G10 断言口诀区+三层）——故测试前置标注，语义=老师自制卷星级。
+    _tag_star_levels(qids[2:22])
+    step("4a2.专项20题星级标注(★7/★★8/★★★5)", True, "fixture: biz_question.star_level")
     segs = [
         {"name": "思维题", "style": "开场·换元/单位巧思", "question_ids": qids[0:2],
          "rules": "", "note": "2 道思维题快速进入状态，一题一坑"},
