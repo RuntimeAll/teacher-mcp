@@ -164,15 +164,16 @@ async def main():
     created.sort(key=lambda x: str(x.get("sessionDate") or x.get("date")))
     first_session = str(created[0].get("id") or created[0].get("sessionId"))
 
+    # 段名/口诀 = 09a/09b/09c 原版逐字（打印件卷头与原版一致；note 空则卷头无副标题行）
     segs = [
-        {"name": "思维题", "style": "开场·换元/单位巧思", "question_ids": ids["mind"],
-         "rules": "", "note": "2 道思维题快速进入状态，一题一坑"},
-        {"name": "奥数专项·最值", "style": "书挑题·★分层", "question_ids": ids["zx"],
+        {"name": "第 1 次课 · ① 思维题", "style": "开场·换元/单位巧思", "question_ids": ids["mind"],
+         "rules": "", "note": ""},
+        {"name": "最值问题 · 专项练习", "style": "书挑题·★分层", "question_ids": ids["zx"],
          "rules": "第一层★7/第二层★★8/第三层★★★5选做",
-         "note": "【核心口诀】和一定，两数越接近积越大、越悬殊积越小；积一定，两数越接近和越小。"
-                 "造大数：大数字往高位放，后续大数字给当前较小的数。"},
-        {"name": "课内过关", "style": "收尾过关·简单不费脑", "question_ids": ids["kn"],
-         "rules": "基础6+进阶3", "note": "大数的认识·会读会写，易错向"},
+         "note": "① 和一定：两数越接近，积越大；越悬殊，积越小。反过来——积一定，几个数越接近，和越小。"
+                 "② 造大数：大数字往高位放；同时造两个数时，下一个大数字给当前较小的那个，让它们“又大又接近”。"},
+        {"name": "课内过关 · 大数的认识", "style": "收尾过关·简单不费脑", "question_ids": ids["kn"],
+         "rules": "", "note": ""},
     ]
     rb = await S._build_prep_pack(client, lesson_id=lesson_ids[0], segs=segs)
     pack_id = str(rb.get("pack_id"))
