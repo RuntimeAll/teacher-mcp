@@ -38,9 +38,10 @@ async def main():
     seqs = [str(r.get("planLessonId")) for r in rows]
     step("G4b.绑定课次按日期序单调无重复", len(set(seqs)) == 13, f"lessons={seqs}")
 
-    # ── G3 大纲态课次合法（仅标题保存、无题目、prep_state=0）──
+    # ── G3 大纲态课次合法（仅标题保存、无题目、prepState=0 由包状态推导）──
+    # R1a·S1：建计划必传 target_id 归属
     rp = await S._upsert_course_plan(client,
-        {"name": "G3-大纲态验证计划", "target_type": "0", "term_tag": "暑假", "year": 2026},
+        {"name": "G3-大纲态验证计划", "target_type": "0", "target_id": TID, "term_tag": "暑假", "year": 2026},
         [{"lesson_seq": 1, "title": "G3-仅大纲无题课次"}])
     g3_plan = rp.get("plan_id")
     g3_ok = bool(rp.get("ok") and rp.get("lesson_ids"))

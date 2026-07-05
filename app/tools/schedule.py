@@ -43,7 +43,8 @@ _LESSON_KEYMAP = {
     "id": "id", "lesson_seq": "lessonSeq", "title": "title", "lesson_type": "lessonType",
     "tag": "tag", "source_ref": "sourceRef", "thinking_action": "thinkingAction",
     "layer_target": "layerTarget", "parent_copy": "parentCopy",
-    "kg_node_ids": "kgNodeIds", "seg_template": "segTemplate", "prep_state": "prepState",
+    "kg_node_ids": "kgNodeIds", "seg_template": "segTemplate",
+    # R1b S3：prep_state 已删列，备课状态唯一权威 = biz_prep_pack.status，不再收写入
 }
 
 
@@ -60,14 +61,25 @@ def _map_lesson(d: dict) -> dict:
 
 
 def _map_seg(s: dict) -> dict:
-    """pack 段：{name,style,question_ids:[str],rules?,note?} → BE camelCase；question_id 强制 str 防截尾。"""
-    return {
+    """pack 段：{name,style,question_ids:[str],rules?,note?,groups?} → BE camelCase；question_id 强制 str 防截尾。
+
+    groups（BUG-004 段内分组，可选）= [{title, question_ids:[str]}]，透传给 BE（渲染时组标题起小节）。
+    """
+    out = {
         "name": s.get("name"),
         "style": s.get("style", ""),
         "questionIds": [str(q) for q in (s.get("question_ids") or s.get("questionIds") or [])],
         "rules": s.get("rules", ""),
         "note": s.get("note", ""),
     }
+    groups = s.get("groups")
+    if groups:
+        out["groups"] = [
+            {"title": g.get("title", ""),
+             "question_ids": [str(q) for q in (g.get("question_ids") or g.get("questionIds") or [])]}
+            for g in groups
+        ]
+    return out
 
 
 def _map_item_result(r: dict) -> dict:
@@ -119,15 +131,19 @@ def _rows(resp) -> list:
 
 
 # ───────────────────────── 核心纯函数（G13 直接 import 调用）─────────────────────────
-async def _create_teach_target(client, target_type, name, grade="", subject="",
-                               textbook="", parent_phone="", profile=None, color="") -> dict:
+async def _create_teach_target(client, target_type, name, grade_no=None, grade_year=None,
+                               textbook_edition="", subject="", parent_phone="",
+                               profile=None, color="") -> dict:
+    """R1a 建模：grade/textbook 文本 → gradeNo(int)/gradeYear(int)/textbookEdition(码)/subject(码)。"""
     body: dict = {"targetType": _tt_code(target_type), "name": name}
-    if grade:
-        body["grade"] = grade
+    if grade_no is not None:
+        body["gradeNo"] = int(grade_no)
+    if grade_year is not None:
+        body["gradeYear"] = int(grade_year)
+    if textbook_edition:
+        body["textbookEdition"] = str(textbook_edition)
     if subject:
-        body["subject"] = subject
-    if textbook:
-        body["textbook"] = textbook
+        body["subject"] = str(subject)
     if parent_phone:
         body["parentPhone"] = parent_phone
     if color:
@@ -156,6 +172,10 @@ async def _upsert_course_plan(client, plan: dict, lessons=None) -> dict:
         "termTag": plan.get("term_tag"),
         "year": plan.get("year"),
     }
+    # R1a·S1：计划归属对象（BE 建计划强校验，必传）
+    tid = plan.get("target_id") or plan.get("targetId")
+    if tid is not None:
+        body["targetId"] = str(tid)
     if plan.get("material_note") is not None:
         body["materialNote"] = plan.get("material_note")
     if plan.get("default_seg_template") is not None:
@@ -283,29 +303,35 @@ async def _get_student_profile(client, target_id, target_type="student") -> dict
 def register(mcp, cluster: RuoyiCluster) -> None:
     @mcp.tool()
     async def create_teach_target(
-        target_type: str, name: str, grade: str = "", subject: str = "",
-        textbook: str = "", parent_phone: str = "", profile: dict = None, color: str = "",
+        target_type: str, name: str, grade_no: int = None, grade_year: int = None,
+        textbook_edition: str = "", subject: str = "", parent_phone: str = "",
+        profile: dict = None, color: str = "",
     ) -> dict:
         """建教学对象档案（学生或班级）→ 打 C 线 :8090。返回 {ok, id}（id 为字符串雪花号）。
 
         对象即「教谁」：一个学生或一个班课，后续排课/备课/回收全挂在它身上。
+        🔴 R1a 建模口径：年级/教材不再传文本，改传 gradeNo+gradeYear+字典码。
+           暑期录「升四」= grade_no:4, grade_year:2026（gradeYear=该年级生效学年的起始年，
+           当前年级由服务端按 9/1 学年进位推导）。
         参数:
-          target_type : 'student'（学生一对一）| 'class'（班课）——必填
-          name        : 对象名（学生姓名 / 班级名）
-          grade       : 年级（如 '升四' '四年级'）
-          subject     : 学科（如 '数学'）
-          textbook    : 教材（如 '人教版三年级下册'）
-          parent_phone: 家长手机号
-          profile     : 肖像 dict（学生画像）——UI 四格 = traits/level.desc/level.target_layer/error_signals，
-                        结构见契约 profile_json：{traits:[str], level:{desc,target_layer}, env:str,
-                        history:[{topic,status:'吃透|讲过未吃透',src}],
-                        error_signals:[{tag,evidence,session_id,ts,by:'system|teacher',status:'pending|confirmed'}]}
-          color       : 色板色（空则服务端从色板轮转分配）
+          target_type      : 'student'（学生一对一）| 'class'（班课）——必填
+          name             : 对象名（学生姓名 / 班级名）
+          grade_no         : 年级 1-12（字典 biz_edu_grade；1-6 小学 / 7-9 初中 / 10-12 高中）
+          grade_year       : grade_no 生效学年起始年（如 2026 = 2026-09-01 起学年）
+          textbook_edition : 教材版本字典码（biz_edu_edition：'1'浙教/'2'人教/'3'北师大/'4'苏教）
+          subject          : 学科字典码（biz_edu_subject：'1'数学/'2'科学/'3'语文/'4'英语）
+                             （edition/subject 服务端兼容中文标签归一化，但请按码传）
+          parent_phone     : 家长手机号
+          profile          : 肖像 dict（学生画像）——UI 四格 = traits/level.desc/level.target_layer/error_signals，
+                             结构见契约 profile_json：{traits:[str], level:{desc,target_layer}, env:str,
+                             history:[{topic,status:'吃透|讲过未吃透',src}],
+                             error_signals:[{tag,evidence,session_id,ts,by:'system|teacher',status:'pending|confirmed'}]}
+          color            : 色板色（空则服务端从色板轮转分配）
         """
         try:
             client = await cluster.ensure_c()
-            return await _create_teach_target(client, target_type, name, grade, subject,
-                                              textbook, parent_phone, profile, color)
+            return await _create_teach_target(client, target_type, name, grade_no, grade_year,
+                                              textbook_edition, subject, parent_phone, profile, color)
         except RuoyiError as e:
             return {"ok": False, "error": str(e)}
 
@@ -332,8 +358,10 @@ def register(mcp, cluster: RuoyiCluster) -> None:
         """建/改课程计划 + 批量 upsert 课次（一步到位）→ C 线 :8090。返回 {ok, plan_id, lesson_ids}。
 
         计划 = 一段周期（如一个暑假）的课次编排蓝本；排课时按 lesson_seq 顺序自动绑到场次上。
+        🔴 R1a·S1：计划有归属——新建必传 target_type + target_id（BE 强校验对象存在且归我，缺传 400）。
         参数:
-          plan : {id?, name, target_type:'student|class', term_tag:'暑假|上学期|寒假|下学期', year:int,
+          plan : {id?, name, target_type:'student|class', target_id:str（归属对象 id，🔴 新建必传）,
+                  term_tag:'暑假|上学期|寒假|下学期', year:int,
                   material_note?:str（素材说明，如「学而思 36 周书·挑题制」）,
                   default_seg_template?:list（段模板，lesson 空则继承，见契约 seg_template）,
                   status?:'0草稿|1启用|2归档'}
@@ -422,13 +450,16 @@ def register(mcp, cluster: RuoyiCluster) -> None:
     async def build_prep_pack(lesson_id: str = None, session_id: str = None, segs: list = None) -> dict:
         """装配备课包（按段填题）→ C 线 :8090。返回 {ok, pack_id}。lesson_id/session_id 二选一（散课用 session_id）。
 
-        备课包 = 一次课的分段题单（如 思维题 / 奥数专项 / 课内同步 三段）；1:1，已存在则返已有。
+        备课包 = 一次课的分段题单（如 思维题 / 奥数专项 / 课内同步 三段）；1:1，已存在则返已有
+        （场次已绑课次一律归并 lesson 口径建/取包，一课一包闸）。
         参数:
           lesson_id  : 绑定的课次 id（计划内课次备课）——与 session_id 二选一
           session_id : 绑定的场次 id（散课/外部课直接对场次备课）
           segs       : 段列表 [{name:'段名', style:'风格描述', question_ids:[str]（🔴 字符串 id，防雪花截尾）,
                        rules?:str（分层规则，如 '第一层★7/第二层★★8/第三层★★★5选做'）,
-                       note?:str（口诀/备注文本，专项段的核心口诀走这）}]
+                       note?:str（口诀/备注文本，专项段的核心口诀走这）,
+                       groups?:[{title:'组标题', question_ids:[str]}]（BUG-004 段内分组，可选；
+                       给了 groups 则渲染按组起小节，段级 question_ids 可省）}]
         """
         try:
             client = await cluster.ensure_c()
@@ -438,13 +469,15 @@ def register(mcp, cluster: RuoyiCluster) -> None:
 
     @mcp.tool()
     async def render_prep_pack(pack_id: str, mark_ready: bool = True) -> dict:
-        """把备课包逐段渲染成 PDF（一段一卷 A4，仅题目无解析）→ C 线 :8090。返回 {ok, artifacts}。
+        """把备课包渲染成 PDF（🔴 单文件：全段拼一份 A4，段间强制起新页，仅题目无解析）→ C 线 :8090。返回 {ok, artifacts}。
 
-        🔴 段无题 → 整单报错不出半卷。全段成功且 mark_ready → pack/课次/场次 备课态置「已备好」。
+        🔴 段无题 → 整单报错不出半卷。全段成功且 mark_ready → pack/场次 备课态置「已备好」
+        （备课状态唯一权威 = pack.status，课次态由 pack 推导）。
         参数:
           pack_id    : 备课包 id
           mark_ready : True = 渲染成功后置备课态为已备好（默认 True）
-        返回: {ok, artifacts:[{seg, file:服务端相对路径, pages, url:临时下载地址}]}。
+        返回: {ok, artifacts:[{seg, file:服务端相对路径, pages, url:临时下载地址}]}——
+              🔴 单条（全段渲染 seg="备课材料"；单段重渲 seg=段名），不再一段一文件。
         """
         try:
             client = await cluster.ensure_c()
@@ -458,7 +491,8 @@ def register(mcp, cluster: RuoyiCluster) -> None:
     ) -> dict:
         """课后回收（录逐题对错）→ 生成家长反馈 + 肖像增量 → C 线 :8090。返回 {ok, parent_msg, portrait_delta}。
 
-        提交即标该场次「已上」。parent_msg 服务端模板拼装「家长您好！…思维题：/同步：/拓展奥数：」，
+        提交即标该场次「已上」。parent_msg 服务端模板拼装「家长您好！…思维题：/同步：/拓展奥数：」——
+        🔴 R1b S5：parent_msg 即时生成不落库（提交/查详情时都按当时上下文现算，override 也过内部词防线）；
         🔴 内部词（层/★/素材/挑题/薄弱）一律不进家长文案。portrait_delta = 错/卡题按 cause 聚合出的
         error_signals（by=system,status=pending，带 session_id 溯源），自动 append 进对象肖像。重复提交=覆盖+上一版进 prev_json。
         参数:

@@ -72,16 +72,18 @@ Q_KN = [
 AM1, AM2 = ("09:00", "10:30"), ("10:40", "12:10")
 PM1, PM2 = ("14:00", "15:30"), ("15:50", "17:20")
 STUDENTS = [
-    # (name, grade, subject, textbook, traits, level_desc, target_layer, weekly[(weekday,slot)])
-    ("林悦然", "升六", "数学", "人教版五年级下册", ["细心但速度偏慢"], "校内扎实，备战小升初", "3层",
+    # R1a 建模：(name, 标签, grade_no, grade_year, textbook_edition码, subject码,
+    #            traits, level_desc, target_layer, weekly[(weekday,slot)])
+    # 暑期录「升X」= gradeNo 升入年级 + gradeYear 2026；edition：1浙教/2人教；subject：1数学/2科学
+    ("林悦然", "升六·数学", 6, 2026, "2", "1", ["细心但速度偏慢"], "校内扎实，备战小升初", "3层",
      [(0, AM1), (1, PM2), (3, AM1), (6, AM2)]),
-    ("陈子墨", "初一", "科学", "浙教版七年级上册", ["动手能力强，爱提问"], "校内中上，实验题突出", "3层",
+    ("陈子墨", "初一·科学", 7, 2026, "1", "2", ["动手能力强，爱提问"], "校内中上，实验题突出", "3层",
      [(0, PM1), (2, PM2), (3, AM2), (5, AM1)]),
-    ("王雨桐", "升三", "数学", "人教版二年级下册", ["注意力短，需游戏化引导"], "启蒙段，兴趣优先", "2层",
+    ("王雨桐", "升三·数学", 3, 2026, "2", "1", ["注意力短，需游戏化引导"], "启蒙段，兴趣优先", "2层",
      [(0, AM2), (2, AM1), (3, PM1), (4, PM2)]),
-    ("赵一鸣", "初二", "数学", "人教版八年级上册", ["基础有漏洞，畏难"], "校内中游，先补基本功", "2→3",
+    ("赵一鸣", "初二·数学", 8, 2026, "2", "1", ["基础有漏洞，畏难"], "校内中游，先补基本功", "2→3",
      [(2, AM2), (4, PM1), (5, PM1), (6, AM1)]),
-    ("韩笑笑", "升五", "数学", "人教版四年级下册", ["口算快，书写乱"], "校内良好，冲奥数入门", "3层",
+    ("韩笑笑", "升五·数学", 5, 2026, "2", "1", ["口算快，书写乱"], "校内良好，冲奥数入门", "3层",
      [(1, PM1), (2, PM1), (4, AM1), (5, AM2)]),
 ]
 WEEK_START, WEEKS = dt.date(2026, 7, 6), 4  # 周一起，4 周：7/6 ~ 8/2
@@ -141,15 +143,17 @@ async def main():
     step("登录 C 线 :8090", True)
 
     # ── ③ 苏俊宇全套（原计划不动：PROFILE/LESSONS/SESSION_SLOTS 逐字复用 g13 正本）──
-    r = await S._create_teach_target(client, "student", "苏俊宇", grade="升四", subject="数学",
-                                     textbook="人教版三年级下册", parent_phone="13800002211",
+    # R1a 建模：升四 = gradeNo 4 + gradeYear 2026；人教='2'、数学='1'
+    r = await S._create_teach_target(client, "student", "苏俊宇", grade_no=4, grade_year=2026,
+                                     textbook_edition="2", subject="1", parent_phone="13800002211",
                                      profile=G.PROFILE, color="")
     su_id = str(r.get("id"))
-    step("③建档 苏俊宇（完整肖像）", bool(su_id), f"id={su_id}")
+    step("③建档 苏俊宇（完整肖像·新字段）", bool(su_id), f"id={su_id}")
 
     rp = await S._upsert_course_plan(
         client,
-        {"name": "苏俊宇·2026暑期数学计划", "target_type": "0", "term_tag": "暑假", "year": 2026,
+        {"name": "苏俊宇·2026暑期数学计划", "target_type": "0", "target_id": su_id,
+         "term_tag": "暑假", "year": 2026,
          "material_note": "学而思 36 周书 · 挑题制", "default_seg_template": G.DEFAULT_SEG_TEMPLATE, "status": "1"},
         G.LESSONS)
     plan_id = str(rp.get("plan_id"))
@@ -179,7 +183,9 @@ async def main():
     pack_id = str(rb.get("pack_id"))
     rr = await S._render_prep_pack(client, pack_id, mark_ready=True)
     arts = rr.get("artifacts") or []
-    step("③第 1 次课备课包（真题 2+20+9）render", len(arts) == 3 and all((a.get("pages") or 0) > 0 for a in arts),
+    # BUG-010 单文件拍板：1 个 artifact、pages>=3（三段各起新页）
+    step("③第 1 次课备课包（真题 2+20+9）render 单文件",
+         len(arts) == 1 and (arts[0].get("pages") or 0) >= 3,
          f"pack={pack_id} pages={[a.get('pages') for a in arts]}")
 
     item_results = [
@@ -196,12 +202,13 @@ async def main():
          bool(rv.get("ok") and str(rv.get("parent_msg", "")).startswith("家长您好")),
          (rv.get("parent_msg") or "")[:40].replace("\n", "/"))
 
-    # ── ④ 5 名学生 + 周循环 4 周 ──
-    for name, grade, subject, textbook, traits, desc, layer, weekly in STUDENTS:
+    # ── ④ 5 名学生 + 周循环 4 周（R1a 新字段建档）──
+    for name, label, gno, gyear, edition, subj, traits, desc, layer, weekly in STUDENTS:
         pr = {"traits": traits, "level": {"desc": desc, "target_layer": layer},
               "env": "", "history": [], "error_signals": []}
-        rt = await S._create_teach_target(client, "student", name, grade=grade, subject=subject,
-                                          textbook=textbook, parent_phone="", profile=pr, color="")
+        rt = await S._create_teach_target(client, "student", name, grade_no=gno, grade_year=gyear,
+                                          textbook_edition=edition, subject=subj,
+                                          parent_phone="", profile=pr, color="")
         tid = str(rt.get("id"))
         its = []
         for w in range(WEEKS):
@@ -209,7 +216,7 @@ async def main():
                 d = WEEK_START + dt.timedelta(days=7 * w + wd)
                 its.append({"date": d.isoformat(), "start": st, "end": en})
         rss = await S._schedule_sessions(client, "0", tid, its, auto_bind=False, force=True)
-        step(f"④{name}（{grade}·{subject}）周循环 {len(weekly)} 节×{WEEKS} 周",
+        step(f"④{name}（{label}）周循环 {len(weekly)} 节×{WEEKS} 周",
              len(rss.get("created") or []) == len(its), f"id={tid} created={len(rss.get('created') or [])}")
 
     # ── 验证：首周逐日节数 = 4/3/4/3/3/3/3（含苏俊宇周二/周日）──

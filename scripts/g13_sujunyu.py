@@ -6,14 +6,17 @@
   workplace/.prd_ccw/PRD-C/PRD-C-213/artifacts/模块设计/04-暑期奥数大纲-苏俊宇-v3.md
   workplace/.prd_ccw/PRD-C/PRD-C-213/artifacts/模块设计/07-第1次课备课包-苏俊宇.md
 
-链路（任一步 FAIL 即退出码 1）：
-  ① create_teach_target  建档（完整肖像：traits/level/env/history/error_signals×4）
-  ② upsert_course_plan   暑期计划 + 13 课次（标题/素材源/思维动作/层数/parent_copy/seg_template 抄 04-v3）
+链路（任一步 FAIL 即退出码 1；R1a/R1b 修复轮后口径）：
+  ① create_teach_target  建档（🔴 R1a 新字段：grade_no=4/grade_year=2026/textbook_edition='2'/subject='1'）
+  ② upsert_course_plan   暑期计划 + 13 课次（🔴 R1a·S1 必传 target_id 归属）
   ③ schedule_sessions    批量 13 场（日期钉死 2026），断言 created=13 + 绑定序=lesson_seq 序
-  ④ build_prep_pack      第 1 次课三段（题 id 从 POST /teacher/question/page 取真实公开题 2+20+9=31，不编造）
-  ⑤ render_prep_pack     断言 3 artifact 且 pages>0
-  ⑥ submit_review        录逐题对错，断言 parent_msg 格式 + 内部词黑名单 + portrait_delta pending
+  ④ build_prep_pack      第 1 次课三段（题 id 从 POST /teacher/question/page 取真实公开题 2+20+9=31，不编造；
+                         课内段带 groups 段内分组 BUG-004）
+  ⑤ render_prep_pack     🔴 断言单文件（BUG-010）：1 个 artifact 且 pages>=3（三段起新页）
+  ⑤b update_session      第 1 场标已上（mark_done）
+  ⑥ submit_review        录逐题对错，断言 parent_msg 格式（R1b S5 即时生成）+ 内部词黑名单 + portrait_delta pending
   ⑦ get_student_profile  断言 error_signals 出现新 pending 信号
+  ⑧ rebind-plan 冒烟     建计划 B → 换绑验 {rebound, unbound} → 换绑回计划 A 复位
 
 幂等策略（注明·自行定夺）：开头 list_teach_targets 按「苏俊宇」查重——已存在则**加时间戳后缀**
 另建新档（保证断言确定性，不复用旧档避免旧数据污染断言）；排课若因上一轮 G13 场次「老师撞场」
@@ -41,6 +44,7 @@ from app.tools.schedule import (
     _render_prep_pack,
     _schedule_sessions,
     _submit_review,
+    _update_session,
     _upsert_course_plan,
 )
 
@@ -239,17 +243,18 @@ async def main() -> None:
         plan_name = f"苏俊宇·2026暑期数学计划-G13-{suffix}"
         info(f"查重命中 {len(dup)} 个既有「苏俊宇」档案 → 本轮改用后缀名: {student_name}（幂等重跑）")
 
-    # ── ① 建档 ──
+    # ── ① 建档（R1a 新字段：暑期录升四 = gradeNo 4 + gradeYear 2026；人教='2'、数学='1'）──
     r1 = await _create_teach_target(
-        client, "student", student_name, grade="升四", subject="数学",
-        textbook="人教版三年级下册", profile=PROFILE)
+        client, "student", student_name, grade_no=4, grade_year=2026,
+        textbook_edition="2", subject="1", profile=PROFILE)
     target_id = r1.get("id")
-    step("1.create_teach_target 建档", bool(r1.get("ok") and target_id), f"target_id={target_id}")
+    step("1.create_teach_target 建档(新字段)", bool(r1.get("ok") and target_id), f"target_id={target_id}")
 
-    # ── ② 计划 + 13 课次 ──
+    # ── ② 计划 + 13 课次（R1a·S1 必传 target_id 归属）──
     r2 = await _upsert_course_plan(
         client,
-        plan={"name": plan_name, "target_type": "student", "term_tag": "暑假", "year": 2026,
+        plan={"name": plan_name, "target_type": "student", "target_id": target_id,
+              "term_tag": "暑假", "year": 2026,
               "material_note": "学而思 36 周书 · 挑题制",
               "default_seg_template": DEFAULT_SEG_TEMPLATE, "status": "1"},
         lessons=LESSONS)
@@ -307,22 +312,29 @@ async def main() -> None:
          "rules": "第一层★7/第二层★★8/第三层★★★5选做",
          "note": "【核心口诀】和一定，两数越接近积越大、越悬殊积越小；积一定，两数越接近和越小。"
                  "造大数：大数字往高位放，后续大数字给当前较小的数。"},
-        {"name": "课内过关", "style": "收尾过关·简单不费脑", "question_ids": qids[22:31],
+        # 课内段带 groups 段内分组（BUG-004：渲染按组起小节；组并集 = 段的题）
+        {"name": "课内过关", "style": "收尾过关·简单不费脑",
+         "groups": [{"title": "基础过关", "question_ids": qids[22:28]},
+                    {"title": "进阶", "question_ids": qids[28:31]}],
          "rules": "基础6+进阶3", "note": "大数的认识·会读会写，易错向"},
     ]
     r4 = await _build_prep_pack(client, lesson_id=lesson_ids[0], segs=segs)
     pack_id = r4.get("pack_id")
-    step("4b.build_prep_pack 第1次课三段(2+20+9)", bool(r4.get("ok") and pack_id), f"pack_id={pack_id}")
+    step("4b.build_prep_pack 第1次课三段(2+20+9,课内段groups分组)", bool(r4.get("ok") and pack_id), f"pack_id={pack_id}")
 
-    # ── ⑤ 渲染：3 个 artifact 且 pages>0 ──
+    # ── ⑤ 渲染（🔴 BUG-010 单文件）：1 个 artifact 且 pages>=3（三段各起新页 → 页数至少 3）──
     r5 = await _render_prep_pack(client, pack_id, mark_ready=True)
     arts = r5.get("artifacts", [])
-    pages_ok = all((_get(a, "pages") or 0) > 0 for a in arts) if arts else False
-    step("5.render_prep_pack 3 artifact 且 pages>0",
-         bool(r5.get("ok") and len(arts) == 3 and pages_ok),
-         f"artifacts={len(arts)} pages={[_get(a, 'pages') for a in arts]}")
+    total_pages = (_get(arts[0], "pages") or 0) if arts else 0
+    step("5.render_prep_pack 单文件(1 artifact 且 pages>=3)",
+         bool(r5.get("ok") and len(arts) == 1 and total_pages >= 3),
+         f"artifacts={len(arts)} pages={total_pages}")
     for a in arts:
         info(f"artifact: seg={_get(a, 'seg')} file={_get(a, 'file')} pages={_get(a, 'pages')}")
+
+    # ── ⑤b 第 1 场标已上（mark_done）──
+    r5b = await _update_session(client, first_session_id, "mark_done")
+    step("5b.update_session mark_done 标已上", bool(r5b.get("ok")), "")
 
     # ── ⑥ 课后回收：逐题对错（构造 错/卡 带 cause）──
     item_results = [
@@ -359,6 +371,28 @@ async def main() -> None:
     step("7.get_student_profile error_signals 出现新 pending 信号",
          bool(r7.get("ok") and new_pending),
          f"signals总数={len(signals)} pending(system)={len(new_pending)}")
+
+    # ── ⑧ rebind-plan 换绑冒烟（R1a 简版真做：未上场次整体切新计划 → {rebound, unbound}）──
+    r8p = await _upsert_course_plan(
+        client,
+        plan={"name": f"{plan_name}·换绑冒烟B", "target_type": "student", "target_id": target_id,
+              "term_tag": "暑假", "year": 2026, "status": "1"},
+        lessons=[{"lesson_seq": 1, "title": "换绑冒烟·课次1"},
+                 {"lesson_seq": 2, "title": "换绑冒烟·课次2"}])
+    plan_b = r8p.get("plan_id")
+    step("8a.建换绑目标计划B(2课次)", bool(r8p.get("ok") and plan_b), f"plan_b={plan_b}")
+    rb1 = await client.teacher_post(f"/teacher/schedule/target/0/{target_id}/rebind-plan",
+                                    {"newPlanId": str(plan_b)})
+    rb1 = rb1 if isinstance(rb1, dict) else {}
+    step("8b.rebind-plan 返回 {rebound, unbound}",
+         "rebound" in rb1 and "unbound" in rb1,
+         f"rebound={rb1.get('rebound')} unbound={rb1.get('unbound')}")
+    # 换绑回计划 A 复位（课次依 lesson_seq 顺配；第1场已上不在范围，lesson1 被其占用 → 余 12 课次接 12 场）
+    rb2 = await client.teacher_post(f"/teacher/schedule/target/0/{target_id}/rebind-plan",
+                                    {"newPlanId": str(plan_id)})
+    rb2 = rb2 if isinstance(rb2, dict) else {}
+    step("8c.换绑回计划A复位", "rebound" in rb2 and int(rb2.get("rebound") or 0) >= 1,
+         f"rebound={rb2.get('rebound')} unbound={rb2.get('unbound')}")
 
     await cluster.aclose()
     print("\n===== G13 全链 PASS =====")
