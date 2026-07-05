@@ -299,6 +299,16 @@ async def _get_student_profile(client, target_id, target_type="student") -> dict
     return {"ok": True, "target": resp, "profile": profile}
 
 
+async def _get_plan_detail(client, plan_id) -> dict:
+    """读某课程计划全部课次明细。GET /teacher/schedule/plan/{id}。plan 与 lessons 拆开返。"""
+    resp = await client.teacher_get(f"{BASE}/plan/{plan_id}", {})
+    if not isinstance(resp, dict):
+        return {"ok": True, "plan": None, "lessons": []}
+    lessons = resp.get("lessons") or []
+    plan = {k: v for k, v in resp.items() if k not in ("lessons",)}
+    return {"ok": True, "plan": plan, "lessons": lessons}
+
+
 # ───────────────────────── MCP 工具注册（薄包一层）─────────────────────────
 def register(mcp, cluster: RuoyiCluster) -> None:
     @mcp.tool()
@@ -520,5 +530,29 @@ def register(mcp, cluster: RuoyiCluster) -> None:
         try:
             client = await cluster.ensure_c()
             return await _get_student_profile(client, target_id, target_type)
+        except RuoyiError as e:
+            return {"ok": False, "error": str(e)}
+
+    @mcp.tool()
+    async def get_plan_detail(plan_id: str) -> dict:
+        """读某课程计划的全部课次明细（🔴 备课前读「这节课的编排蓝本」）→ C 线 :8090
+        GET /teacher/schedule/plan/{id}。返回 {ok, plan, lessons}。
+
+        当前链条最硬的读缺口：现有 upsert_course_plan 只写、list_schedule 只给场次概览，读不到
+        某课次的分段蓝本 / 课内锚点 → 圈题无依据。本工具补上。
+        参数:
+          plan_id : 课程计划 id（字符串雪花号；list_schedule 的场次里带 plan_lesson_id 可回溯到 plan）。
+        返回:
+          plan    : {id, name, targetType, targetId, termTag, year, materialNote,
+                     defaultSegTemplate（计划默认段模板）, status, createTime, updateTime, lessonCount}
+          lessons : [{id, planId, lessonSeq, title, lessonType('0'教学/'1'测试), tag, sourceRef,
+                     thinkingAction, layerTarget（层数目标如 '2→3'）, parentCopy（家长版文案，🔴 家长可见、
+                     无内部词）, kgNodeIds:[str]（🔴 课内锚点，直接喂 search_questions(subject_id=)）,
+                     segTemplate:[...]（🔴 分段蓝本：每段名/风格/分层规则，喂 build_prep_pack 的 segs 骨架）,
+                     prepState（备课态，由 pack.status 推导，'0'=未备）}]
+        """
+        try:
+            client = await cluster.ensure_c()
+            return await _get_plan_detail(client, plan_id)
         except RuoyiError as e:
             return {"ok": False, "error": str(e)}
