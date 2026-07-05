@@ -111,11 +111,25 @@ class RuoyiClient:
             "Content-Type": "application/json",
         }
 
-    async def teacher_post(self, path: str, body: Optional[dict] = None) -> Any:
-        """调 /teacher/** 接口，解 envelope（code==1 取 response）。需先 login。"""
+    async def _teacher_call(
+        self,
+        method: str,
+        path: str,
+        body: Optional[dict] = None,
+        params: Optional[dict] = None,
+    ) -> Any:
+        """调 /teacher/** 接口通用底座，解 envelope（code==1 取 response）。需先 login。
+
+        POST/PUT 带 json=body；GET 带 params（query）。envelope 口径三线（POST/GET/PUT）统一。
+        """
         if not self._token:
             raise RuoyiError("未登录会话：请先调 login 工具")
-        resp = await self._client.post(path, json=body or {}, headers=self._headers())
+        kwargs: dict = {"headers": self._headers()}
+        if params is not None:
+            kwargs["params"] = params
+        if method.upper() in ("POST", "PUT"):
+            kwargs["json"] = body or {}
+        resp = await self._client.request(method.upper(), path, **kwargs)
         if resp.status_code == 401:
             raise RuoyiError(f"{path} 401：会话失效，请重新 login")
         try:
@@ -126,6 +140,18 @@ class RuoyiClient:
             msg = data.get("message") or data.get("msg")
             raise RuoyiError(f"{path} 非 code==1: code={data.get('code')} msg={msg}")
         return data.get("response")
+
+    async def teacher_post(self, path: str, body: Optional[dict] = None) -> Any:
+        """调 /teacher/** 接口（POST），解 envelope（code==1 取 response）。需先 login。"""
+        return await self._teacher_call("POST", path, body=body or {})
+
+    async def teacher_put(self, path: str, body: Optional[dict] = None) -> Any:
+        """调 /teacher/** 接口（PUT，改期/改绑/改基本维等），解 envelope。需先 login。"""
+        return await self._teacher_call("PUT", path, body=body or {})
+
+    async def teacher_get(self, path: str, params: Optional[dict] = None) -> Any:
+        """调 /teacher/** 接口（GET，卡片墙/月历/详情等），解 envelope。需先 login。"""
+        return await self._teacher_call("GET", path, params=params or {})
 
     async def lazy_tree(self, body: Optional[dict] = None) -> Any:
         """拉知识点树（组卷白名单源）。POST /teacher/question/lazyTree。"""
