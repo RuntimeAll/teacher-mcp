@@ -29,7 +29,7 @@ def _prep_text() -> str:
     return _read(_PREP)
 
 
-def register(mcp, client=None) -> None:
+def register(mcp, client=None, default_role="ingest") -> None:
     @mcp.resource("teacher://manual/ingest-role")
     def ingest_role_manual() -> str:
         """录入角色说明书（README 全文）：路由矩阵 + IngestItem 契约 + 工具契约。fresh agent 先读它再干活。"""
@@ -41,7 +41,7 @@ def register(mcp, client=None) -> None:
         return _prep_text()
 
     @mcp.tool()
-    def get_role_manual(role: str = "ingest") -> dict:
+    def get_role_manual(role: str = "") -> dict:
         """取角色说明书全文。role 分角色返回：
 
         - role="ingest"（默认）= 录入角色（README：七类来源路由矩阵 + IngestItem 契约面板 + 全部工具契约）。
@@ -51,7 +51,7 @@ def register(mcp, client=None) -> None:
         🔴 首次以某身份使用本 server 的 agent 先调对应 role：说明书告诉你这条线怎么一步步走、每步调什么工具。
         返回: {ok, role, manual}（markdown 全文）。
         """
-        r = (role or "ingest").strip().lower()
+        r = (role or default_role or "ingest").strip().lower()
         if r in ("prep", "备课", "prep-role", "lesson"):
             return {"ok": True, "role": "prep", "manual": _prep_text()}
         return {"ok": True, "role": "ingest", "manual": _ingest_text()}

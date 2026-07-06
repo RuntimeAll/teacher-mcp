@@ -210,6 +210,60 @@ copy .env.example .env   # 填 RUOYI_USERNAME/RUOYI_PASSWORD + db_*（不入 git
 .venv\Scripts\python.exe tools\mcp_call.py ingest_items --file batch.json   # 大参数走文件
 ```
 
+## 三助手视图连接（FEAT-002 · `TEACHER_MCP_ROLE` 分组注册）
+> PRD-C-213 延伸·三助手角色账号拆分·第一阶段。同一入口 `app.server`，**按 env `TEACHER_MCP_ROLE` 只注册本职工具组** + 各连接用**自己的账号**（`RUOYI_USERNAME/PASSWORD` 覆盖 `.env` 兜底）。
+> 🔴 缺省（不设 `TEACHER_MCP_ROLE` 或 =`all`）= 全量 34 工具，**向后兼容**、现状不变。
+
+**四视图工具组**（共享组=全角色可见：`login`/`list_kg_tree`/`resolve_kg`/`search_questions`/`get_question`/`get_role_manual` + manual resources）：
+
+| ROLE | 工具数 | 组内新增（除共享组） | 典型用途 |
+|---|---|---|---|
+| `all`（缺省） | 34 | 全部 | 总账号/兼容现状 |
+| `prep` | 24 | schedule 全套 + build/render/submit/get_student_profile/get_plan_detail + list/get_lecture_content + compose/create/update_paper + **ingest_items/upload_image**（变式补题链） | 备课助手 |
+| `ingest` | 15 | ingest/convert/label 全套（format/upload/ingest_question/ingest_items/verify + convert_doc/pdf/parse_paper_text + label_question） | 题目录入助手 |
+| `lecture` | 14 | lecture 全套（convert_lecture_docx/save/remove_frag）+ list/get_lecture_content + convert_doc/pdf/parse_paper_text | 讲义录入助手 |
+
+`get_role_manual` 缺省角色跟随 `TEACHER_MCP_ROLE`（prep→prep 手册，ingest/lecture→录入手册）。
+
+**三条目 .mcp.json 示例**（同一入口、不同 env；🔴 密码见 `password/mcp-assistants.md`，别贴明文；改完须**重启 Claude session**，MCP 不热加载）：
+```jsonc
+{
+  "mcpServers": {
+    "prep-assistant": {
+      "command": "d:\\workplace\\book-ai\\teacher-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "app.server"],
+      "env": {
+        "PYTHONPATH": "d:\\workplace\\book-ai\\teacher-mcp",
+        "TEACHER_MCP_ROLE": "prep",
+        "RUOYI_USERNAME": "prep_assistant",
+        "RUOYI_PASSWORD": "<见password/mcp-assistants.md>"
+      }
+    },
+    "qbank-assistant": {
+      "command": "d:\\workplace\\book-ai\\teacher-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "app.server"],
+      "env": {
+        "PYTHONPATH": "d:\\workplace\\book-ai\\teacher-mcp",
+        "TEACHER_MCP_ROLE": "ingest",
+        "RUOYI_USERNAME": "qbank_assistant",
+        "RUOYI_PASSWORD": "<见password/mcp-assistants.md>"
+      }
+    },
+    "lecture-assistant": {
+      "command": "d:\\workplace\\book-ai\\teacher-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "app.server"],
+      "env": {
+        "PYTHONPATH": "d:\\workplace\\book-ai\\teacher-mcp",
+        "TEACHER_MCP_ROLE": "lecture",
+        "RUOYI_USERNAME": "lecture_assistant",
+        "RUOYI_PASSWORD": "<见password/mcp-assistants.md>"
+      }
+    }
+  }
+}
+```
+> 🔴 **边界**：本阶段是**工具视图优化**，非安全边界——`/teacher/**` 端点仍**零 `@SaCheckPermission`**，任一登录账号（换 ROLE 或裸调 HTTP）仍可调全部端点。接口级权限收窄已立为**下一轮 PRD 候选**（改造面=全 controller 权限注解或全局路由拦截 + 权限码 seed，有全站误伤风险需独立验证）。数据范围隔离另经 service 按 `create_by` 天然成立（本阶段已自验：助手账号建的对象 admin 查不到）。
+
 ## 加能力 = 加一个目录（AC6 解耦）
 身份层(`tools/auth.py`) / 读层(`tools/kg.py`) / 转换层(`tools/convert.py`) / 写层(`tools/ingest.py`) / 组卷(`tools/compose.py`) / 打标(`tools/label.py`) / 讲义(`tools/lecture.py`) 已分离。二期照样：新增 `app/tools/<name>.py` 写 `register(mcp, client)` + `app/server.py` 加一行。`login`/鉴权/底座调用层(`app/ruoyi.py`)不动。
 > 🔴 讲义类工具走 C 线 :8090 = `register(mcp, cluster)` 传**整个 cluster**（非 `cluster.a`），工具内 `await cluster.ensure_c()` 懒登录后用；题目类工具传 `cluster.a`（A 线 :8080）。
