@@ -24,6 +24,10 @@ PREP_ONLY = {"create_teach_target", "list_teach_targets", "upsert_course_plan", 
              "get_student_profile", "get_plan_detail", "list_lecture_docs", "get_lecture_content",
              "compose_paper", "create_paper", "update_paper", "ingest_items", "upload_image"}
 
+# 非共享·举一反三组（PRD-O-005 批3 新增 7，契约 v2）
+VARIANT_ONLY = {"make_variants", "confirm_variant_chapter", "generate_variants",
+                "verify_variant", "edit_variant", "compose_variant_figure", "persist_variants"}
+
 ALL_34 = SHARED | INGEST_ONLY | LECTURE_ONLY | PREP_ONLY
 
 
@@ -38,7 +42,10 @@ def test_baseline_is_34():
 
 @pytest.mark.asyncio
 async def test_role_all():
-    assert await _names("all") == ALL_34 | HEALTH  # 35
+    # 批3 起 all 视图纳入举一反三 7 工具：34 ∪ health ∪ variant7 = 42（仍 ⊇ 旧 34，G1 兼容）
+    names = await _names("all")
+    assert ALL_34 <= names  # G1：⊇ 旧 34
+    assert names == ALL_34 | HEALTH | VARIANT_ONLY  # 42
 
 
 @pytest.mark.asyncio
@@ -64,8 +71,8 @@ async def test_role_data():
 
 @pytest.mark.asyncio
 async def test_role_variant():
-    # 本批 variant 组还没有工具，空组 → 只剩 shared ∪ health
-    assert await _names("variant") == SHARED | HEALTH  # 7
+    # 批3 落地：variant 视图 = shared6 ∪ health ∪ 7 个举一反三工具 = 14
+    assert await _names("variant") == SHARED | HEALTH | VARIANT_ONLY  # 14
 
 
 @pytest.mark.asyncio

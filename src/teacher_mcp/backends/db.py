@@ -137,6 +137,27 @@ def set_paper_subject(paper_id, category_id):
     c.close()
 
 
+# ───────────────────────── ④b 题图 oss_url 只读查表（举一反三入口用）─────────────────────────
+
+def question_image_url(question_id):
+    """取某题的图 oss_url（biz_question_image，举一反三入口只认图片 URL）。
+    优先 role='stem' 的图，其次任意 http 图（按 seq）。无图 → None。
+    🔴 现实数据：biz_question.stem_img_url 常 NULL，图只在 biz_question_image——故此处直查该表
+       （HTTP /teacher/question/list 的 stemImg 覆盖不全）。只读，挂账同 db.py 头注释。"""
+    c = conn()
+    try:
+        with c.cursor() as cur:
+            cur.execute(
+                "SELECT oss_url, role, seq FROM biz_question_image"
+                " WHERE question_id=%s AND oss_url LIKE 'http%%'"
+                " ORDER BY (role='stem') DESC, seq ASC, id ASC LIMIT 1",
+                (int(question_id),))
+            row = cur.fetchone()
+    finally:
+        c.close()
+    return row[0] if row else None
+
+
 # ───────────────────────── ④ KG 只读查表 ─────────────────────────
 
 def _subseq(query, name):

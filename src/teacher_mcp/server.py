@@ -16,10 +16,12 @@ import os
 from fastmcp import FastMCP
 
 from teacher_mcp.backends.ruoyi import RuoyiClient
+from teacher_mcp.backends.toolkit import ToolkitClient
 from teacher_mcp.tools import data_lecture as tool_lecture
 from teacher_mcp.tools import data_qbank as tool_qbank
 from teacher_mcp.tools import prep as tool_prep
 from teacher_mcp.tools import shared as tool_shared
+from teacher_mcp.tools import variant as tool_variant
 
 # ── ROLE → 暴露 tag 集合（None = 全量，不过滤）──
 ROLE_TAGS = {
@@ -46,12 +48,14 @@ def build_server(role: str = "all") -> FastMCP:
 
     mcp = FastMCP("teacher-mcp")
     client = RuoyiClient()  # 单会话（stdio 单进程）；A/C 已合并 :9090
+    toolkit = ToolkitClient(client)  # 举一反三底座（:9093）；注入 client 取登录 token
 
     @atexit.register
     def _cleanup() -> None:
         try:
             import anyio
             anyio.run(client.aclose)
+            anyio.run(toolkit.aclose)
         except Exception:
             pass
 
@@ -60,8 +64,7 @@ def build_server(role: str = "all") -> FastMCP:
     tool_qbank.register(mcp, client)                 # 录题组（convert/format/ingest/verify/label）
     tool_lecture.register(mcp, client)               # 讲义组（convert_lecture_docx/save/remove/list/get）
     tool_prep.register(mcp, client)                  # 备课组（schedule 11 + compose/create/update_paper）
-    # 二期占位（同样「加一个 tools 模块 + register 一行」）：
-    #   tool_variant.register(mcp, client)  # make_variants（举一反三，tags={"variant"}）
+    tool_variant.register(mcp, client, toolkit)      # 举一反三组（make_variants 等 7，tags={"variant"}）
 
     # ── 角色过滤（暴露期，only=True）──
     if tags is not None:

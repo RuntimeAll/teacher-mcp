@@ -41,6 +41,11 @@ class RuoyiClient:
 
     # ───────────────────────── 会话态 ─────────────────────────
     @property
+    def token(self) -> Optional[str]:
+        """只读暴露登录 access_token（供 toolkit 举一反三入口注入 agent_config.ruoyi_token）。未登录=None。"""
+        return self._token
+
+    @property
     def user_id(self) -> Optional[int]:
         return self._user_id
 
