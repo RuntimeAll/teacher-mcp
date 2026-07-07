@@ -13,6 +13,7 @@ dependencies = [
     "python-docx>=1.1",      # 讲义忠实转换器
     "dwml>=0.2",             # OMML→LaTeX
     "lxml>=5.0",
+    "matplotlib>=3.8",       # D8 方案A 渲图旁路：题干 markdown+$LaTeX$ → 试卷版式 PNG（mathtext）
 ]
 
 [dependency-groups]

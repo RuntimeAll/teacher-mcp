@@ -2,7 +2,8 @@
 
 薄代理 toolkit 举一反三端点（H2 配方实测），多轮有状态编排；智能决策（挑章节/改题内容）
 留给驱动 agent，MCP 只做确定性透传 + 编排信号。铁律：
-  - 入口只认图片 URL（question_id 路线 MCP 内查该题图 oss_url，无图→ok:false 按 D8）。
+  - 入口只认图片 URL；D8 方案 A「渲图旁路」：纯文本题（无图）由 MCP 确定性渲图→传 OSS→喂引擎，
+    不再软拒绝（question_id 无图 / stem_text 直传均走此路，返回 rendered_stem:true）。
   - 每次 invoke 必带真实 RuoYi token（ToolkitClient 从登录态注入 agent_config.ruoyi_token）。
   - id 全链路字符串（雪花截尾坑）；异常一律 {ok:false, error, hint}，绝不抛协议级异常。
   - persist 前须 verify（说明书铁律）；配图可 dsl 覆盖重绘。
@@ -20,7 +21,7 @@ from teacher_mcp.backends.toolkit import (
 
 _TK_DOWN_HINT = "toolkit(:9093) 未起，起法=start-dev -Part tk"
 _LOGIN_HINT = "先调 login 工具（举一反三入口需真实 RuoYi 登录态）"
-_D8_NO_FIG_HINT = "该题无图，当前举一反三引擎为图驱动（D8：纯文本题不进举一反三）"
+_RENDER_FAIL_HINT = "渲图旁路失败（题干渲染或传 OSS 未成）——见 error；可改传 image_url 走带图路径"
 
 
 def _err(e: Exception) -> dict:
@@ -118,21 +119,58 @@ def register(mcp, ruoyi_client: RuoyiClient, toolkit_client: ToolkitClient) -> N
         from teacher_mcp.backends import db
         return db.question_image_url(qid)
 
+    async def _fetch_stem(question_id: str) -> str:
+        """question_id → 纯文本题干（stemText）。查 /teacher/question/list，取第一行 stemText。"""
+        qid = str(question_id).strip()
+        resp = await ruoyi_client.teacher_get("/teacher/question/list", {"ids": qid})
+        rows = resp if isinstance(resp, list) else (resp.get("list") or resp.get("rows") or [])
+        if rows and isinstance(rows[0], dict):
+            return str(rows[0].get("stemText") or "").strip()
+        return ""
+
+    async def _render_and_upload(stem: str) -> str:
+        """题干渲图旁路：render_stem → 落 tempfile → upload_image 传 OSS → 返回 oss_url。
+
+        渲染或上传任一环失败 → 抛异常（由 make_variants 转 _RENDER_FAIL_HINT 软拒绝）。
+        """
+        from teacher_mcp.domains.stemrender import render_stem
+        rendered = render_stem(stem)
+        if not rendered.get("ok") or not rendered.get("path"):
+            raise ToolkitError(f"题干渲图失败: {rendered.get('error') or '未产出图片'}")
+        path = rendered["path"]
+        try:
+            resp = await ruoyi_client.teacher_post(
+                "/teacher/ingest/image", {"localPath": path, "assetKind": "figure"}
+            )
+            oss_url = (resp or {}).get("ossUrl")
+            if not oss_url or not str(oss_url).startswith("http"):
+                raise ToolkitError(f"渲出图传 OSS 无 ossUrl: {resp}")
+            return str(oss_url)
+        finally:
+            try:
+                import os
+                os.remove(path)
+            except OSError:
+                pass
+
     # ───────────────────────── 1. 母题轮 ─────────────────────────
     @mcp.tool(tags={"variant"})
     async def make_variants(
-        question_id: str = "", image_url: str = "", hint: str = "",
+        question_id: str = "", image_url: str = "", stem_text: str = "", hint: str = "",
         count: int = 3, thread_id: str = "",
     ) -> dict:
-        """举一反三·母题轮：读图解题打标 → 出母题卡（LLM 轮 ~60s）。图驱动（入口只认图片 URL）。
+        """举一反三·母题轮：读图解题打标 → 出母题卡（LLM 轮 ~60s）。图驱动 + D8 渲图旁路。
 
-        入参二选一：
+        入参三选一（image_url > stem_text > question_id 优先级）：
           - image_url : 公网可达图片 URL（.png/.jpg/.jpeg/.webp）——直接喂入口。
-          - question_id: 题库题 id（字符串）→ MCP 内查该题 biz_question_image 的 oss_url；无图→ok:false（D8）。
+          - stem_text : 纯文本题干（可含 $LaTeX$/markdown）→ MCP 确定性渲图→传 OSS→喂引擎（rendered_stem:true）。
+          - question_id: 题库题 id（字符串）→ 先查 biz_question_image 的 oss_url；
+                         **无图则走渲图旁路**（取该题 stemText 渲图→传 OSS），返回 rendered_stem:true。
           - hint      : 追加指令（如「侧重折叠」），默认「帮我把这道题举一反三」。
           - count     : 变式数（进 message 文案，实际生成在 generate_variants）。
           - thread_id : 续跑同一母题会话用；缺省自动生成（uuid4）。返回值里带回，后续工具必传它。
-        返回: {ok, thread_id, status:"ready"|"need_confirm", mother_card, kg_candidates?, reply}。
+        返回: {ok, thread_id, status:"ready"|"need_confirm", mother_card, kg_candidates?, reply, rendered_stem?}。
+          - rendered_stem=true ⇒ 母题图由渲图旁路生成（题干确定性渲染，opus 读图 OCR）。
           - status=need_confirm（低置信/骨架空分支）→ 读 kg_candidates 挑章 → confirm_variant_chapter。
           - status=ready → 直接 generate_variants。
           - mother_card=None（入口回催图/催登录）→ ok:false，hint=引擎回文（reply）。
@@ -140,12 +178,27 @@ def register(mcp, ruoyi_client: RuoyiClient, toolkit_client: ToolkitClient) -> N
         try:
             tk.require_token()  # 早失败给清晰 login 提示
             url = (image_url or "").strip()
+            rendered_stem = False
             if not url:
-                if not (question_id or "").strip():
-                    return {"ok": False, "error": "需 question_id 或 image_url 其一", "hint": "带图题传 image_url 或 question_id"}
-                url = await _resolve_image_url(question_id)
+                stem = (stem_text or "").strip()
+                if not stem and not (question_id or "").strip():
+                    return {"ok": False, "error": "需 question_id / image_url / stem_text 其一",
+                            "hint": "带图题传 image_url；纯文本题传 stem_text 或 question_id（自动渲图旁路）"}
+                if not stem:
+                    # question_id 路线：优先取真图；无图则取 stemText 走渲图旁路
+                    url = await _resolve_image_url(question_id)
+                    if not url:
+                        stem = await _fetch_stem(question_id)
+                        if not stem:
+                            return {"ok": False, "error": f"题 {question_id} 既无图也无题干文本",
+                                    "hint": "该题 stemText 为空，无法渲图旁路；核对题 id"}
                 if not url:
-                    return {"ok": False, "error": f"题 {question_id} 无图", "hint": _D8_NO_FIG_HINT}
+                    # stem_text 直传 或 question_id 无图 → 渲图旁路
+                    try:
+                        url = await _render_and_upload(stem)
+                        rendered_stem = True
+                    except Exception as e:  # noqa: BLE001
+                        return {"ok": False, "error": f"{type(e).__name__}: {e}", "hint": _RENDER_FAIL_HINT}
             tid = (thread_id or "").strip() or _new_thread()
             message = f"{hint or '帮我把这道题举一反三'}，出{int(count)}道变式 {url}"
             resp = await tk.invoke(message, tid)
@@ -156,13 +209,16 @@ def register(mcp, ruoyi_client: RuoyiClient, toolkit_client: ToolkitClient) -> N
             mconfirm = header.get("mother_confirm") or {}
             if not mother_card:
                 # 入口未产出母题卡（催图/催登录/图不可达）——把引擎回文透出给驱动 agent
-                return {"ok": False, "thread_id": tid, "error": "未产出母题卡", "hint": reply[:400] or "入口未识别图片，确认 URL 公网可达且以图片扩展名结尾"}
+                return {"ok": False, "thread_id": tid, "error": "未产出母题卡",
+                        "rendered_stem": rendered_stem,
+                        "hint": reply[:400] or "入口未识别图片，确认 URL 公网可达且以图片扩展名结尾"}
             need_confirm = bool(mconfirm.get("needs_confirm"))
             out = {
                 "ok": True,
                 "thread_id": tid,
                 "status": "need_confirm" if need_confirm else "ready",
                 "mother_card": mother_card,
+                "rendered_stem": rendered_stem,
                 "reply": reply[:400],
             }
             if need_confirm:

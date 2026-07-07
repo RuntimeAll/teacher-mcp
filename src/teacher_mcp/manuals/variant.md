@@ -7,17 +7,21 @@
 ## 第 0 步 · 登录
 先 `login(username, password)`（或 .env 配好后无参调用）。举一反三入口有**身份硬闸**：每次 invoke 必带真实 RuoYi token（MCP 从登录态自动注入 `agent_config.ruoyi_token`，你不用管），落库 owner=登录老师。未 login → 所有 variant 工具返回 `{ok:false, hint:"先 login"}`。
 
-## 🔴 图驱动铁律（D8）
-举一反三入口**只认图片 URL**（`.png/.jpg/.jpeg/.webp`，公网可达）。
+## 🔴 图驱动 + 渲图旁路（D8 方案 A）
+举一反三入口**只认图片 URL**（`.png/.jpg/.jpeg/.webp`，公网可达）。三条入参（优先级 image_url > stem_text > question_id）：
 - `make_variants(image_url=...)`：直接喂图 URL。
-- `make_variants(question_id=...)`：MCP 内查该题 `biz_question_image` 的 oss_url 拼进 message。
-- **纯文本题（无图）**：返回 `{ok:false, hint:"该题无图，当前举一反三引擎为图驱动"}`——不进举一反三（渲图旁路是独立能力，本卡不做）。
+- `make_variants(question_id=...)`：MCP 内先查该题 `biz_question_image` 的 oss_url；**无图则自动走渲图旁路**（取该题 `stemText` 确定性渲成试卷版式 PNG→传 OSS→喂引擎），返回体带 `rendered_stem:true`。
+- `make_variants(stem_text="题干 markdown+$LaTeX$")`：纯文本题干直接渲图旁路（不落题库、临时图），返回 `rendered_stem:true`。适合"手头一道纯文本题、还没入库"就想举一反三。
+
+**渲图旁路 = MCP 内零 LLM 确定性渲染**（`domains/stemrender.py`，matplotlib mathtext）：题干里的 `$...$` 走数学排版，markdown 粗体/表格降级为纯文本，`![](url)` 占位渲为「[图]」。坏 LaTeX 逃生仓：解析失败的段落原样当纯文本渲（opus OCR 连源码都读得懂，无害），永不抛。引擎侧是 opus 多模态 OCR，图干净清晰即可，不追像素级精确。
+- 渲染或传 OSS 失败 → 保留软拒绝语义：`{ok:false, hint:"渲图旁路失败…可改传 image_url"}`。
+- 🔴 忠实度自检：渲图旁路走 OCR，数字/符号/公式偶有走样风险；母题轮出卡后**对比 `mother_card.stem` 与原题干**，发现走样则改传更清晰的 `stem_text` 或直接 `image_url`。
 
 ## 工具清单（7 工具，tags={"variant"}）
 
 | 工具 | 作用 | 关键返回 |
 |---|---|---|
-| `make_variants(question_id?, image_url?, hint?, count?, thread_id?)` | 母题轮：读图解题打标出母题卡（LLM ~60s） | `{ok, thread_id, status:"ready"\|"need_confirm", mother_card, kg_candidates?}` |
+| `make_variants(question_id?, image_url?, stem_text?, hint?, count?, thread_id?)` | 母题轮：读图解题打标出母题卡（LLM ~60s）；无图→渲图旁路 | `{ok, thread_id, status:"ready"\|"need_confirm", mother_card, kg_candidates?, rendered_stem?}` |
 | `confirm_variant_chapter(thread_id, chapter_id)` | 确认章分支续跑（低置信/骨架空时，~3s） | `{ok, status:"ready", mother_card}` |
 | `generate_variants(thread_id, auto_verify?)` | 触发变式生成取题组（LLM ~70s） | `{ok, count, variants:[{item_id, seq, stem, answer, solution, dna, tier, figure_spec?}]}` |
 | `verify_variant(thread_id, item_id)` | 单题独立 sympy 验算（无状态，~17s） | `{ok, verdict:"pass"\|"fail"\|"degrade", reason, computed}` |

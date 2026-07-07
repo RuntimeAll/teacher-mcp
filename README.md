@@ -55,12 +55,12 @@ copy .env.example .env   # 填 RUOYI_USERNAME/PASSWORD（不入 git）
 | data·录题 | convert_doc / convert_pdf / parse_paper_text / format_question / upload_image / ingest_question / **ingest_items**(统一入库口) / verify_ingest / label_question |
 | data·讲义 | convert_lecture_docx / save_lecture_frag / remove_lecture_frag / list_lecture_docs / get_lecture_content |
 | prep | schedule 11 工具 + compose_paper / create_paper / update_paper |
-| **variant（新）** | make_variants / confirm_variant_chapter / generate_variants / verify_variant / edit_variant / compose_variant_figure / persist_variants —— 编排流程见 `manuals/variant.md` |
+| **variant（新）** | make_variants（无图题走 D8 渲图旁路：题干→PNG→OSS，返回 rendered_stem） / confirm_variant_chapter / generate_variants / verify_variant / edit_variant / compose_variant_figure / persist_variants —— 编排流程见 `manuals/variant.md` |
 
 ## 纪律与已知边界
 
 - 🔴 代码空间只放代码：题图/暂存/dump 一律不入库（.gitignore 建仓即闸，G8 gate 断言）。
-- 🔴 D8：举一反三入口只认**带图题**（引擎为图驱动）；纯文本题返回 ok:false + hint。
+- 🔴 D8 方案 A（渲图旁路）：举一反三入口图驱动，但**纯文本题不再软拒绝**——MCP 内确定性渲图（`domains/stemrender.py`，matplotlib mathtext，零 LLM）→ 传 OSS → 喂引擎，返回 `rendered_stem:true`；渲染/上传失败才软拒绝。
 - 🔴 /teacher/** 在 BE 端完全无鉴权（2026-07-07 实测，不登录也可调）——本仓不修（权限收窄另立卡），MCP 仍走真实登录（落库归属/审计）。
 - pymysql 旁路（backends/db.py）挂账：对外开放（stdio→HTTP）前须 HTTP 化。
 - 转换器（domains/）与旧仓字节级等价（G5 gate 守护），改它先想想 \xa0。
