@@ -28,3 +28,4 @@ packages = ["src/teacher_mcp"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+python_files = ["test_*.py", "gate_*.py"]  # gate_* = PRD-O-005 回归闸，必须进默认收集
