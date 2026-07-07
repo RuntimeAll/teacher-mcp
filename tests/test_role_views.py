@@ -82,3 +82,20 @@ async def test_get_role_manual_callable():
         r = await c.call_tool("get_role_manual", {"role": "data"})
     assert r.data.get("ok") is True
     assert "录入角色说明书" in r.data.get("manual", "")
+
+
+@pytest.mark.asyncio
+async def test_get_role_manual_all():
+    """role='all' → 总手册（PRD-O-005 收尾：手册烤进 MCP）。"""
+    async with Client(build_server("all")) as c:
+        r = await c.call_tool("get_role_manual", {"role": "all"})
+    assert r.data.get("ok") is True
+    assert r.data.get("role") == "all"
+    assert "总手册" in r.data.get("manual", "")
+
+
+def test_server_has_instructions():
+    """FastMCP 实例带 instructions（进 MCP initialize 响应，给客户端上手指引）。"""
+    srv = build_server("all")
+    assert getattr(srv, "instructions", "")
+    assert "get_role_manual" in srv.instructions

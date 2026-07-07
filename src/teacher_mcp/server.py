@@ -33,11 +33,21 @@ ROLE_TAGS = {
     "lecture": {"shared", "lecture"},
 }
 
-# get_role_manual 缺省角色跟随 ROLE：prep→prep.md，variant→variant.md，其余→data.md
+# get_role_manual 缺省角色跟随 ROLE：prep→prep.md，variant→variant.md，all→all.md，其余→data.md
 _MANUAL_ROLE = {
     "prep": "prep", "variant": "variant",
-    "all": "data", "data": "data", "ingest": "data", "lecture": "data",
+    "all": "all", "data": "data", "ingest": "data", "lecture": "data",
 }
+
+# MCP initialize 响应携带的浓缩指引（长文在 get_role_manual('all')；此处只给上手最小闭环）
+_INSTRUCTIONS = (
+    "teacher-mcp = 老师系统操作全权代理（录题/录讲义/备课/举一反三四线，经 book-server:9090 + toolkit:9093）。\n"
+    "上手三步：① health_check() 探活 → ② login()（无参走 .env admin 兜底）→ "
+    "③ get_role_manual('all') 取总手册，或按本职取 'data'/'prep'/'variant'。\n"
+    "铁律：所有写工具需先 login；id（题/对象/计划/场次/包/qid）全链路以字符串传（雪花号 JSON double 会截尾）；"
+    "kp_id 必 resolve_kg 查真叶子严禁编造；灌库后必 verify_ingest；举一反三 persist 前须 verify。\n"
+    "报错先看 ok:false 的 hint（含 9093=起 toolkit / 未登录=login）。"
+)
 
 
 def build_server(role: str = "all") -> FastMCP:
@@ -46,7 +56,7 @@ def build_server(role: str = "all") -> FastMCP:
     tags = ROLE_TAGS.get(role, None)
     manual_role = _MANUAL_ROLE.get(role, "data")
 
-    mcp = FastMCP("teacher-mcp")
+    mcp = FastMCP("teacher-mcp", instructions=_INSTRUCTIONS)
     client = RuoyiClient()  # 单会话（stdio 单进程）；A/C 已合并 :9090
     toolkit = ToolkitClient(client)  # 举一反三底座（:9093）；注入 client 取登录 token
 

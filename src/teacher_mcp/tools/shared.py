@@ -18,6 +18,8 @@ _MANUAL_DIR = Path(__file__).resolve().parent.parent / "manuals"
 # ───────────────────────── 说明书：role → 文件名 ─────────────────────────
 def _manual_file(role: str) -> str:
     r = (role or "").strip().lower()
+    if r in ("all", "总", "全", "总手册"):
+        return "all"
     if r in ("prep", "备课", "prep-role", "lesson"):
         return "prep"
     if r in ("variant", "变式", "举一反三"):
@@ -168,6 +170,10 @@ def register(mcp, client: RuoyiClient, default_role: str = "data") -> None:
     def _manual_variant() -> str:
         return _read_manual("variant") or "（变式角色说明书缺失）"
 
+    @mcp.resource("teacher://manual/all")
+    def _manual_all() -> str:
+        return _read_manual("all") or "（总手册缺失）"
+
     @mcp.tool(tags={"shared"})
     async def login(username: str = "", password: str = "") -> dict:
         """以真实 teacher 账号登录平台，拿双头 token 注入本会话身份（后续所有工具隐式带该身份、落 RuoYi 权限审计）。
@@ -302,6 +308,7 @@ def register(mcp, client: RuoyiClient, default_role: str = "data") -> None:
           - role="data"/"ingest"/"lecture"（录入线）= 录入角色说明书（七类来源路由 + IngestItem 契约 + 讲义录入）。
           - role="prep" = 备课角色说明书（备课线路编排 + 私有池铁律 + 变式补题路径）。
           - role="variant" = 举一反三角色说明书（批 3 落笔）。
+          - role="all" = 总手册（开场三步 + 四线工具地图 + 四条编排流程 + 铁律盒子 + 自救表）——fresh agent 首选。
         🔴 首次以某身份使用本 server 的 agent 先调对应 role：说明书告诉你这条线怎么一步步走、每步调什么工具。
         返回: {ok, role, manual}（markdown 全文）；文件缺失 → {ok:False, hint}。
         """
