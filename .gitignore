@@ -1,0 +1,20 @@
+# PRD-O-005 G8 杂物闸：建仓即配，代码空间只放代码
+.venv/
+__pycache__/
+*.pyc
+.env
+*.log
+uv.lock
+
+# 运行期暂存产物一律不入库（旧仓 48M 题图教训）
+.work/
+.paper_imgs/
+.paper_work/
+.lecture_work/
+.lecture_imgs/
+*.png
+*.jpg
+*.jpeg
+*.webp
+# fixtures 白名单（G5 等价回归样例，小文件例外）
+!tests/fixtures/**
