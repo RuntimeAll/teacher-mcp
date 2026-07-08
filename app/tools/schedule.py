@@ -39,16 +39,33 @@ def _lesson_type_code(v) -> str:
     return m.get(str(v), str(v))
 
 
+# 🔴 PRD-B-101：seg_template（段模板）→ paper_slots（专项卷位）契约平移。
+#    旧字段收到即报错拒绝——不静默兼容，防「两套字段并存」漂移。
+def _reject_deprecated_seg(d: dict, old: str, new: str) -> None:
+    """收到已退役的 seg_template 系字段 → 立即抛错，明确指引新字段名与结构。"""
+    if isinstance(d, dict) and old in d:
+        raise RuoyiError(
+            f"字段 '{old}' 已退役(PRD-B-101 备课材料×组卷归并)，请改用 '{new}'。"
+            f"课次内容模型已从『段模板 seg_template』升维为『专项卷位 paper_slots』：一课次 = N 张专项卷，"
+            f"每卷位可绑一张卷。新结构 paper_slots=[{{slot_seq:int, name:str(必填非空), style:str, "
+            f"rules:str, note:str}}]；绑卷字段(paper_id/manual_ready)由服务端管，agent 写入通常只给 "
+            f"slot_seq/name/style/rules/note。备课=逐卷位 compose_paper/create_paper(lesson_id,slot_seq)+bind，"
+            f"见 get_role_manual(role='prep')。"
+        )
+
+
 _LESSON_KEYMAP = {
     "id": "id", "lesson_seq": "lessonSeq", "title": "title", "lesson_type": "lessonType",
     "tag": "tag", "source_ref": "sourceRef", "thinking_action": "thinkingAction",
     "layer_target": "layerTarget", "parent_copy": "parentCopy",
-    "kg_node_ids": "kgNodeIds", "seg_template": "segTemplate",
-    # R1b S3：prep_state 已删列，备课状态唯一权威 = biz_prep_pack.status，不再收写入
+    "kg_node_ids": "kgNodeIds", "paper_slots": "paperSlots",
+    # 🔴 PRD-B-101：seg_template → paper_slots；旧字段走 _reject_deprecated_seg 拒收，不再映射
+    # R1b S3：prep_state 已删列，备课状态唯一权威 = 服务端按 paper_slots 推导，不再收写入
 }
 
 
 def _map_lesson(d: dict) -> dict:
+    _reject_deprecated_seg(d, "seg_template", "paper_slots")
     out: dict = {}
     for k, v in d.items():
         ck = _LESSON_KEYMAP.get(k, k)
@@ -176,10 +193,11 @@ async def _upsert_course_plan(client, plan: dict, lessons=None) -> dict:
     tid = plan.get("target_id") or plan.get("targetId")
     if tid is not None:
         body["targetId"] = str(tid)
+    _reject_deprecated_seg(plan, "default_seg_template", "default_paper_slots")
     if plan.get("material_note") is not None:
         body["materialNote"] = plan.get("material_note")
-    if plan.get("default_seg_template") is not None:
-        body["defaultSegTemplate"] = plan.get("default_seg_template")
+    if plan.get("default_paper_slots") is not None:
+        body["defaultPaperSlots"] = plan.get("default_paper_slots")
     if plan.get("status") is not None:
         body["status"] = str(plan.get("status"))
     if pid:
@@ -369,18 +387,23 @@ def register(mcp, cluster: RuoyiCluster) -> None:
 
         计划 = 一段周期（如一个暑假）的课次编排蓝本；排课时按 lesson_seq 顺序自动绑到场次上。
         🔴 R1a·S1：计划有归属——新建必传 target_type + target_id（BE 强校验对象存在且归我，缺传 400）。
+        🔴 PRD-B-101 契约平移：课次内容模型 = **专项卷位 paper_slots**（替代旧 seg_template『段模板』）。
+           一课次 = N 张专项卷，每卷位可绑一张卷。**旧字段 seg_template / default_seg_template 收到即报错拒绝**
+           （不静默兼容，防两套字段并存漂移）。
         参数:
           plan : {id?, name, target_type:'student|class', target_id:str（归属对象 id，🔴 新建必传）,
                   term_tag:'暑假|上学期|寒假|下学期', year:int,
                   material_note?:str（素材说明，如「学而思 36 周书·挑题制」）,
-                  default_seg_template?:list（段模板，lesson 空则继承，见契约 seg_template）,
+                  default_paper_slots?:list（默认专项卷位模板，lesson 空则继承）,
                   status?:'0草稿|1启用|2归档'}
                  —— 带 id = 改计划基本维，空 id = 新建。🔴 无 total_lessons（=课次数实时聚合）。
           lessons : 课次列表，每个 dict:{id?（空=新增）, lesson_seq:int, title, lesson_type:'0教学|1测试',
                     tag?（自由标签，吃透课走这）, source_ref?（素材源，如「学而思第10+11周」）,
                     thinking_action?（思维动作）, layer_target?（层数目标，如 '2→3'）,
                     parent_copy?（家长版口语文案）, kg_node_ids?:[str]（课内同步锚的 biz_subject id）,
-                    seg_template?:list（本课次段模板，覆盖计划默认）}
+                    paper_slots?:list（本课次专项卷位模板，覆盖计划默认）：
+                    [{slot_seq:int, name:str(必填非空), style:str, rules:str, note:str}]
+                    （🔴 绑定字段 paper_id/manual_ready 由服务端管，agent 写入通常只给 slot_seq/name/style/rules/note）}
         """
         try:
             client = await cluster.ensure_c()
@@ -458,42 +481,30 @@ def register(mcp, cluster: RuoyiCluster) -> None:
 
     @mcp.tool()
     async def build_prep_pack(lesson_id: str = None, session_id: str = None, segs: list = None) -> dict:
-        """装配备课包（按段填题）→ C 线 :8090。返回 {ok, pack_id}。lesson_id/session_id 二选一（散课用 session_id）。
+        """🔴 DEPRECATED（PRD-B-101 已退役）：备课不再走「装备课包」，改为**按卷位组卷**。
 
-        备课包 = 一次课的分段题单（如 思维题 / 奥数专项 / 课内同步 三段）；1:1，已存在则返已有
-        （场次已绑课次一律归并 lesson 口径建/取包，一课一包闸）。
-        参数:
-          lesson_id  : 绑定的课次 id（计划内课次备课）——与 session_id 二选一
-          session_id : 绑定的场次 id（散课/外部课直接对场次备课）
-          segs       : 段列表 [{name:'段名', style:'风格描述', question_ids:[str]（🔴 字符串 id，防雪花截尾）,
-                       rules?:str（分层规则，如 '第一层★7/第二层★★8/第三层★★★5选做'）,
-                       note?:str（口诀/备注文本，专项段的核心口诀走这）,
-                       groups?:[{title:'组标题', question_ids:[str]}]（BUG-004 段内分组，可选；
-                       给了 groups 则渲染按组起小节，段级 question_ids 可省）}]
+        备课材料模型已从「一包 N 段」升维为「一课次 N 张专项卷位」：逐卷位
+        `compose_paper/create_paper(lesson_id, slot_seq)` 建卷（自动落【备课卷】+ 绑卷位）+
+        `bind_paper_slot` 管理绑定，PDF 由平台前端导出（MCP 不再出 PDF）。
+        本工具仅保留返回退役指引，不再执行任何操作。见 get_role_manual(role='prep')。
         """
-        try:
-            client = await cluster.ensure_c()
-            return await _build_prep_pack(client, lesson_id, session_id, segs)
-        except RuoyiError as e:
-            return {"ok": False, "error": str(e)}
+        return {
+            "ok": False,
+            "error": "build_prep_pack 已退役(PRD-B-101)，备课=按卷位 compose_paper+bind，见 get_role_manual(role='prep')",
+        }
 
     @mcp.tool()
-    async def render_prep_pack(pack_id: str, mark_ready: bool = True) -> dict:
-        """把备课包渲染成 PDF（🔴 单文件：全段拼一份 A4，段间强制起新页，仅题目无解析）→ C 线 :8090。返回 {ok, artifacts}。
+    async def render_prep_pack(pack_id: str = None, mark_ready: bool = True) -> dict:
+        """🔴 DEPRECATED（PRD-B-101 已退役）：MCP 不再出 PDF。
 
-        🔴 段无题 → 整单报错不出半卷。全段成功且 mark_ready → pack/场次 备课态置「已备好」
-        （备课状态唯一权威 = pack.status，课次态由 pack 推导）。
-        参数:
-          pack_id    : 备课包 id
-          mark_ready : True = 渲染成功后置备课态为已备好（默认 True）
-        返回: {ok, artifacts:[{seg, file:服务端相对路径, pages, url:临时下载地址}]}——
-              🔴 单条（全段渲染 seg="备课材料"；单段重渲 seg=段名），不再一段一文件。
+        备课卷 PDF 一律走组卷前端链路（平台「我的卷库·备课卷」导出），服务端简化渲染（纯 Java PDF）退役。
+        备课改为逐卷位 `compose_paper/create_paper(lesson_id, slot_seq)` + `bind_paper_slot`。
+        本工具仅保留返回退役指引，不再执行任何操作。见 get_role_manual(role='prep')。
         """
-        try:
-            client = await cluster.ensure_c()
-            return await _render_prep_pack(client, pack_id, mark_ready)
-        except RuoyiError as e:
-            return {"ok": False, "error": str(e)}
+        return {
+            "ok": False,
+            "error": "render_prep_pack 已退役(PRD-B-101)，备课=按卷位 compose_paper+bind，见 get_role_manual(role='prep')",
+        }
 
     @mcp.tool()
     async def submit_review(
@@ -544,12 +555,14 @@ def register(mcp, cluster: RuoyiCluster) -> None:
           plan_id : 课程计划 id（字符串雪花号；list_schedule 的场次里带 plan_lesson_id 可回溯到 plan）。
         返回:
           plan    : {id, name, targetType, targetId, termTag, year, materialNote,
-                     defaultSegTemplate（计划默认段模板）, status, createTime, updateTime, lessonCount}
+                     defaultPaperSlots（计划默认专项卷位模板）, status, createTime, updateTime, lessonCount}
           lessons : [{id, planId, lessonSeq, title, lessonType('0'教学/'1'测试), tag, sourceRef,
                      thinkingAction, layerTarget（层数目标如 '2→3'）, parentCopy（家长版文案，🔴 家长可见、
                      无内部词）, kgNodeIds:[str]（🔴 课内锚点，直接喂 search_questions(subject_id=)）,
-                     segTemplate:[...]（🔴 分段蓝本：每段名/风格/分层规则，喂 build_prep_pack 的 segs 骨架）,
-                     prepState（备课态，由 pack.status 推导，'0'=未备）}]
+                     paperSlots:[{slot_seq,name,style,rules,note,paper_id,manual_ready}]（🔴 PRD-B-101 专项卷位蓝本：
+                     每卷位对应一张专项卷；空卷位=待组，逐卷位走 compose_paper/create_paper(lesson_id,slot_seq)）,
+                     paperSlotsInherited（true=继承自计划 default_paper_slots）,
+                     prepState（备课态，服务端按 paper_slots 推导：'0'未备/'1'备课中/'2'已备好）}]
         """
         try:
             client = await cluster.ensure_c()
