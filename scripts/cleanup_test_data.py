@@ -54,10 +54,13 @@ for win in (("2026-07-07 11:43:49", "2026-07-07 11:43:51"),
         " AND create_user=1 AND create_time BETWEEN %s AND %s", win)
     if variant_ids:
         break
-if len(variant_ids) != 3:
-    print(f"🔴 中止：G4 变式簇应恰好 3 行，实得 {len(variant_ids)}: {variant_ids}（人工核）")
+if len(variant_ids) == 0:
+    print("G4 变式簇: 0 道（已清理过，跳过）")
+elif len(variant_ids) != 3:
+    print(f"🔴 中止：G4 变式簇应为 0（已清）或 3 行，实得 {len(variant_ids)}: {variant_ids}（人工核）")
     sys.exit(1)
-print(f"G4 变式簇: 3 道 {variant_ids}")
+else:
+    print(f"G4 变式簇: 3 道 {variant_ids}")
 qids += variant_ids
 
 # 文本内容 id（删 biz_question 前先取）
