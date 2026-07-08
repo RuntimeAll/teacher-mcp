@@ -2,11 +2,14 @@
   教学安排与备课闭环 11 工具（create_teach_target/list_teach_targets/upsert_course_plan/
     schedule_sessions/list_schedule/update_session/build_prep_pack/render_prep_pack/
     submit_review/get_student_profile/get_plan_detail）
-  组卷 3 工具（compose_paper/create_paper/update_paper）
+  组卷 4 工具（compose_paper/create_paper/update_paper/bind_paper_slot）
 
 PRD-O-005 重建：合并旧 app/tools/{schedule,compose}.py；单 client（:9090，A/C 已合并），
 删 cluster.ensure_c()，工具直接用注入的 client。schedule 保留「模块级 async 纯函数 + @tool 薄包」结构。
 🔴 _standard_scores 在本模块 module 级定义（data_qbank.ingest_items 成卷分值复用它）。
+🔴 PRD-B-101（B 线移植）：课次内容模型 seg_template『段模板』→ paper_slots『专项卷位』契约平移；
+   新增 bind_paper_slot（卷位绑定管理）；compose_paper/create_paper 加 lesson_id+slot_seq 建卷即绑卷位；
+   build_prep_pack/render_prep_pack 退役（保留 @tool 返退役指引，MCP 不再出 PDF，PDF 走平台前端导出）。
 """
 from typing import Optional
 
@@ -69,16 +72,33 @@ def _lesson_type_code(v) -> str:
     return m.get(str(v), str(v))
 
 
+# 🔴 PRD-B-101：seg_template（段模板）→ paper_slots（专项卷位）契约平移。
+#    旧字段收到即报错拒绝——不静默兼容，防「两套字段并存」漂移。
+def _reject_deprecated_seg(d: dict, old: str, new: str) -> None:
+    """收到已退役的 seg_template 系字段 → 立即抛错，明确指引新字段名与结构。"""
+    if isinstance(d, dict) and old in d:
+        raise RuoyiError(
+            f"字段 '{old}' 已退役(PRD-B-101 备课材料×组卷归并)，请改用 '{new}'。"
+            f"课次内容模型已从『段模板 seg_template』升维为『专项卷位 paper_slots』：一课次 = N 张专项卷，"
+            f"每卷位可绑一张卷。新结构 paper_slots=[{{slot_seq:int, name:str(必填非空), style:str, "
+            f"rules:str, note:str}}]；绑卷字段(paper_id/manual_ready)由服务端管，agent 写入通常只给 "
+            f"slot_seq/name/style/rules/note。备课=逐卷位 compose_paper/create_paper(lesson_id,slot_seq)+bind，"
+            f"见 get_role_manual(role='prep')。"
+        )
+
+
 _LESSON_KEYMAP = {
     "id": "id", "lesson_seq": "lessonSeq", "title": "title", "lesson_type": "lessonType",
     "tag": "tag", "source_ref": "sourceRef", "thinking_action": "thinkingAction",
     "layer_target": "layerTarget", "parent_copy": "parentCopy",
-    "kg_node_ids": "kgNodeIds", "seg_template": "segTemplate",
-    # R1b S3：prep_state 已删列，备课状态唯一权威 = biz_prep_pack.status，不再收写入
+    "kg_node_ids": "kgNodeIds", "paper_slots": "paperSlots",
+    # 🔴 PRD-B-101：seg_template → paper_slots；旧字段走 _reject_deprecated_seg 拒收，不再映射
+    # R1b S3：prep_state 已删列，备课状态唯一权威 = 服务端按 paper_slots 推导，不再收写入
 }
 
 
 def _map_lesson(d: dict) -> dict:
+    _reject_deprecated_seg(d, "seg_template", "paper_slots")
     out: dict = {}
     for k, v in d.items():
         ck = _LESSON_KEYMAP.get(k, k)
@@ -206,10 +226,11 @@ async def _upsert_course_plan(client, plan: dict, lessons=None) -> dict:
     tid = plan.get("target_id") or plan.get("targetId")
     if tid is not None:
         body["targetId"] = str(tid)
+    _reject_deprecated_seg(plan, "default_seg_template", "default_paper_slots")
     if plan.get("material_note") is not None:
         body["materialNote"] = plan.get("material_note")
-    if plan.get("default_seg_template") is not None:
-        body["defaultSegTemplate"] = plan.get("default_seg_template")
+    if plan.get("default_paper_slots") is not None:
+        body["defaultPaperSlots"] = plan.get("default_paper_slots")
     if plan.get("status") is not None:
         body["status"] = str(plan.get("status"))
     if pid:
@@ -343,18 +364,26 @@ async def _get_plan_detail(client, plan_id) -> dict:
 def register(mcp, client: RuoyiClient) -> None:
     # ── 组卷 3 工具 ──
     @mcp.tool(tags={"prep"})
-    async def compose_paper(outline: list[OutlineItem], title: str = "") -> dict:
+    async def compose_paper(outline: list[OutlineItem], title: str = "",
+                            lesson_id: str = "", slot_seq: int = 0) -> dict:
         """按大纲从真题库确定性组卷并真落库 biz_paper，归属当前登录 teacher。
 
         参数:
           outline: [{subjectId, subjectName?, questionType, difficult, count}, ...]
                    subjectId 取自 list_kg_tree 的叶子 id；编排层负责选点，本工具不二次解析意图。
           title:   卷名（可选，默认"MCP组卷"）。
+          lesson_id / slot_seq: 🔴 PRD-B-101 备课卷位绑定（可选，二者必须**同现**）——给了则本卷落
+                   【备课卷】(paper_kind='2') 并绑到该课次卷位；只给一个 → 本地报错不发请求；
+                   都省 = 普通卷（一切照旧）。🔴 备课卷私有，绝不 set-public。
         返回:
           {ok, paper_id, item_count, paper, notes}；底座不在/无匹配题 → {ok:false, reason}（不假成功）。
         """
         if not client.has_session():
             return {"ok": False, "reason": "需先 login"}
+        has_lesson, has_slot = bool(lesson_id), bool(slot_seq and int(slot_seq) > 0)
+        if has_lesson != has_slot:
+            return {"ok": False, "reason": "lesson_id 与 slot_seq 必须同现（备课卷位绑定）："
+                    "只给一个无效。要么都给（绑卷位=备课卷 paper_kind=2），要么都省（普通卷）。"}
         teacher_id: Optional[int] = client.user_id
         if teacher_id is None:
             return {"ok": False, "reason": "会话无 teacher_id，请重新 login"}
@@ -369,6 +398,9 @@ def register(mcp, client: RuoyiClient) -> None:
             "save": True,          # 🔴 真落库
             "teacherId": teacher_id,  # 🔴 归属当前登录 teacher
         }
+        if has_lesson:            # 🔴 PRD-B-101：透传绑卷位（BE 自动 paper_kind='2' + 绑 slot）
+            body["lessonId"] = str(lesson_id)
+            body["slotSeq"] = int(slot_seq)
         try:
             resp = await client.auto_generate(body)
         except RuoyiError as e:
@@ -408,7 +440,8 @@ def register(mcp, client: RuoyiClient) -> None:
         }
 
     @mcp.tool(tags={"prep"})
-    async def create_paper(name: str, question_ids: list[int], paper_category_id: str = "") -> dict:
+    async def create_paper(name: str, question_ids: list[int], paper_category_id: str = "",
+                           lesson_id: str = "", slot_seq: int = 0) -> dict:
         """按指定题目 id 列表（顺序即试卷内题号顺序）组装成一套**试卷**入卷库，归属当前登录 teacher。
 
         用于整卷录入：题目已 ingest_question 入库后，把它们按原卷题号顺序串成 biz_paper（建 section + biz_paper_question 关联）。
@@ -416,15 +449,25 @@ def register(mcp, client: RuoyiClient) -> None:
           name: 试卷名（如原卷标题），1-200 字符。
           question_ids: 题目 id 列表，**顺序 = 试卷内题号顺序**，至少 1 题。
           paper_category_id: 试卷分类 id（可选，卷库目录树；空=根级）。
+          lesson_id / slot_seq: 🔴 PRD-B-101 备课卷位绑定（可选，二者必须**同现**）——给了则本卷落
+                   【备课卷】(paper_kind='2') 并绑到该课次卷位；只给一个 → 本地报错不发请求；
+                   都省 = 普通卷。🔴 备课卷私有，绝不 set-public。
         返回: {ok, paper_id, ...}；异常 → {ok:false, reason}。
         """
         if not client.has_session():
             return {"ok": False, "reason": "需先 login"}
         if not name or not question_ids:
             return {"ok": False, "reason": "name 与 question_ids 必填"}
+        has_lesson, has_slot = bool(lesson_id), bool(slot_seq and int(slot_seq) > 0)
+        if has_lesson != has_slot:
+            return {"ok": False, "reason": "lesson_id 与 slot_seq 必须同现（备课卷位绑定）："
+                    "只给一个无效。要么都给（绑卷位=备课卷 paper_kind=2），要么都省（普通卷）。"}
         body = {"name": name, "questionIds": [int(q) for q in question_ids]}
         if paper_category_id:
             body["paperCategoryId"] = paper_category_id
+        if has_lesson:            # 🔴 PRD-B-101：透传绑卷位（BE 自动 paper_kind='2' + 绑 slot，事务一致）
+            body["lessonId"] = str(lesson_id)
+            body["slotSeq"] = int(slot_seq)
         try:
             resp = await client.teacher_post("/teacher/exam/paper/create", body)
         except RuoyiError as e:
@@ -473,6 +516,56 @@ def register(mcp, client: RuoyiClient) -> None:
         except RuoyiError as e:
             return {"ok": False, "reason": f"更新失败: {e}"}
         return {"ok": True, "paper_id": paper_id, "total": sum(scores), "per_question": scores}
+
+    @mcp.tool(tags={"prep"})
+    async def bind_paper_slot(lesson_id: str, slot_seq: int = 0, action: str = "bind",
+                              paper_id: str = "", ready: bool = True) -> dict:
+        """🔴 PRD-B-101 备课卷位绑定管理（绑既有卷 / 解绑 / 标记已备好）→ 备课线。返回 {ok, paper_slots, prep_state}。
+
+        备课主路 = 组卷时直接带 lesson_id+slot_seq 建卷即自动绑（create_paper/compose_paper）；
+        本工具是**事后管理**：把已有卷挂到卷位（D7 兜底）、解绑、或手动标记整课次已备好。
+        🔴 备课卷私有，本工具不含任何公开化能力（绝不 set-public）。
+        参数:
+          lesson_id : 课次 id（字符串雪花号）——必填。
+          slot_seq  : 卷位序号（≥1）——action=bind/unbind 必填；action=manual_ready 忽略（课次级）。
+          action    : 动作枚举——
+            'bind'         绑既有卷到卷位（传 paper_id，必须真实存在且归我；BE 自动置该卷 paper_kind='2'）
+            'unbind'      解绑卷位（卷留库不删；🔴 解绑会自动清该课次 manual_ready=false）
+            'manual_ready' 手动标记整课次备课态（传 ready；0 卷位课次 → BE 400）
+          paper_id  : action=bind 时必填（要挂的既有卷 id，字符串雪花号）。
+          ready     : action=manual_ready 时的目标态（True=已备好，默认 True）。
+        返回: {ok, paper_slots:[...], prep_state:'0未备/1备课中/2已备好'}；异常 → {ok:false, error}。
+        """
+        if not client.has_session():
+            return {"ok": False, "error": "需先 login"}
+        if not lesson_id:
+            return {"ok": False, "error": "lesson_id 必填"}
+        lid = str(lesson_id)
+        base = f"{BASE}/plan/lesson/{lid}"
+        try:
+            if action == "bind":
+                if not paper_id:
+                    return {"ok": False, "error": "action='bind' 需传 paper_id（要挂的既有卷 id）"}
+                if not (slot_seq and int(slot_seq) > 0):
+                    return {"ok": False, "error": "action='bind' 需传 slot_seq（≥1）"}
+                resp = await client.teacher_post(
+                    f"{base}/slot/{int(slot_seq)}/bind", {"paperId": str(paper_id)})
+            elif action == "unbind":
+                if not (slot_seq and int(slot_seq) > 0):
+                    return {"ok": False, "error": "action='unbind' 需传 slot_seq（≥1）"}
+                resp = await client.teacher_post(f"{base}/slot/{int(slot_seq)}/unbind", {})
+            elif action == "manual_ready":
+                resp = await client.teacher_post(f"{base}/manual-ready", {"ready": bool(ready)})
+            else:
+                return {"ok": False, "error": f"未知 action: {action}（应为 bind/unbind/manual_ready）"}
+        except RuoyiError as e:
+            return {"ok": False, "error": f"{action} 失败: {e}"}
+        resp = resp or {}
+        return {
+            "ok": True,
+            "paper_slots": resp.get("paperSlots") if isinstance(resp, dict) else None,
+            "prep_state": resp.get("prepState") if isinstance(resp, dict) else None,
+        }
 
     # ── 教学安排与备课闭环 11 工具 ──
     @mcp.tool(tags={"prep"})
@@ -531,18 +624,23 @@ def register(mcp, client: RuoyiClient) -> None:
 
         计划 = 一段周期（如一个暑假）的课次编排蓝本；排课时按 lesson_seq 顺序自动绑到场次上。
         🔴 R1a·S1：计划有归属——新建必传 target_type + target_id（BE 强校验对象存在且归我，缺传 400）。
+        🔴 PRD-B-101 契约平移：课次内容模型 = **专项卷位 paper_slots**（替代旧 seg_template『段模板』）。
+           一课次 = N 张专项卷，每卷位可绑一张卷。**旧字段 seg_template / default_seg_template 收到即报错拒绝**
+           （不静默兼容，防两套字段并存漂移）。
         参数:
           plan : {id?, name, target_type:'student|class', target_id:str（归属对象 id，🔴 新建必传）,
                   term_tag:'暑假|上学期|寒假|下学期', year:int,
                   material_note?:str（素材说明，如「学而思 36 周书·挑题制」）,
-                  default_seg_template?:list（段模板，lesson 空则继承，见契约 seg_template）,
+                  default_paper_slots?:list（默认专项卷位模板，lesson 空则继承）,
                   status?:'0草稿|1启用|2归档'}
                  —— 带 id = 改计划基本维，空 id = 新建。🔴 无 total_lessons（=课次数实时聚合）。
           lessons : 课次列表，每个 dict:{id?（空=新增）, lesson_seq:int, title, lesson_type:'0教学|1测试',
                     tag?（自由标签，吃透课走这）, source_ref?（素材源，如「学而思第10+11周」）,
                     thinking_action?（思维动作）, layer_target?（层数目标，如 '2→3'）,
                     parent_copy?（家长版口语文案）, kg_node_ids?:[str]（课内同步锚的 biz_subject id）,
-                    seg_template?:list（本课次段模板，覆盖计划默认）}
+                    paper_slots?:list（本课次专项卷位模板，覆盖计划默认）：
+                    [{slot_seq:int, name:str(必填非空), style:str, rules:str, note:str}]
+                    （🔴 绑定字段 paper_id/manual_ready 由服务端管，agent 写入通常只给 slot_seq/name/style/rules/note）}
         """
         try:
             out = await _upsert_course_plan(client, plan, lessons)
@@ -619,43 +717,30 @@ def register(mcp, client: RuoyiClient) -> None:
 
     @mcp.tool(tags={"prep"})
     async def build_prep_pack(lesson_id: str = None, session_id: str = None, segs: list = None) -> dict:
-        """装配备课包（按段填题）→ :9090。返回 {ok, pack_id, view_url}。lesson_id/session_id 二选一（散课用 session_id）。
+        """🔴 DEPRECATED（PRD-B-101 已退役）：备课不再走「装备课包」，改为**按卷位组卷**。
 
-        备课包 = 一次课的分段题单（如 思维题 / 奥数专项 / 课内同步 三段）；1:1，已存在则返已有
-        （场次已绑课次一律归并 lesson 口径建/取包，一课一包闸）。
-        参数:
-          lesson_id  : 绑定的课次 id（计划内课次备课）——与 session_id 二选一
-          session_id : 绑定的场次 id（散课/外部课直接对场次备课）
-          segs       : 段列表 [{name:'段名', style:'风格描述', question_ids:[str]（🔴 字符串 id，防雪花截尾）,
-                       rules?:str（分层规则，如 '第一层★7/第二层★★8/第三层★★★5选做'）,
-                       note?:str（口诀/备注文本，专项段的核心口诀走这）,
-                       groups?:[{title:'组标题', question_ids:[str]}]（BUG-004 段内分组，可选；
-                       给了 groups 则渲染按组起小节，段级 question_ids 可省）}]
+        备课材料模型已从「一包 N 段」升维为「一课次 N 张专项卷位」：逐卷位
+        `compose_paper/create_paper(lesson_id, slot_seq)` 建卷（自动落【备课卷】+ 绑卷位）+
+        `bind_paper_slot` 管理绑定，PDF 由平台前端导出（MCP 不再出 PDF）。
+        本工具仅保留返回退役指引，不再执行任何操作。见 get_role_manual(role='prep')。
         """
-        try:
-            out = await _build_prep_pack(client, lesson_id, session_id, segs)
-            if isinstance(out, dict) and out.get("ok"):
-                out["view_url"] = "http://localhost:9091/desk/prep"  # 🔴 备课台深链
-            return out
-        except RuoyiError as e:
-            return {"ok": False, "error": str(e)}
+        return {
+            "ok": False,
+            "error": "build_prep_pack 已退役(PRD-B-101)，备课=按卷位 compose_paper+bind，见 get_role_manual(role='prep')",
+        }
 
     @mcp.tool(tags={"prep"})
-    async def render_prep_pack(pack_id: str, mark_ready: bool = True) -> dict:
-        """把备课包渲染成 PDF（🔴 单文件：全段拼一份 A4，段间强制起新页，仅题目无解析）→ :9090。返回 {ok, artifacts}。
+    async def render_prep_pack(pack_id: str = None, mark_ready: bool = True) -> dict:
+        """🔴 DEPRECATED（PRD-B-101 已退役）：MCP 不再出 PDF。
 
-        🔴 段无题 → 整单报错不出半卷。全段成功且 mark_ready → pack/场次 备课态置「已备好」
-        （备课状态唯一权威 = pack.status，课次态由 pack 推导）。
-        参数:
-          pack_id    : 备课包 id
-          mark_ready : True = 渲染成功后置备课态为已备好（默认 True）
-        返回: {ok, artifacts:[{seg, file:服务端相对路径, pages, url:临时下载地址}]}——
-              🔴 单条（全段渲染 seg="备课材料"；单段重渲 seg=段名），不再一段一文件。
+        备课卷 PDF 一律走组卷前端链路（平台「我的卷库·备课卷」导出），服务端简化渲染（纯 Java PDF）退役。
+        备课改为逐卷位 `compose_paper/create_paper(lesson_id, slot_seq)` + `bind_paper_slot`。
+        本工具仅保留返回退役指引，不再执行任何操作。见 get_role_manual(role='prep')。
         """
-        try:
-            return await _render_prep_pack(client, pack_id, mark_ready)
-        except RuoyiError as e:
-            return {"ok": False, "error": str(e)}
+        return {
+            "ok": False,
+            "error": "render_prep_pack 已退役(PRD-B-101)，备课=按卷位 compose_paper+bind，见 get_role_manual(role='prep')",
+        }
 
     @mcp.tool(tags={"prep"})
     async def submit_review(
@@ -704,12 +789,14 @@ def register(mcp, client: RuoyiClient) -> None:
           plan_id : 课程计划 id（字符串雪花号；list_schedule 的场次里带 plan_lesson_id 可回溯到 plan）。
         返回:
           plan    : {id, name, targetType, targetId, termTag, year, materialNote,
-                     defaultSegTemplate（计划默认段模板）, status, createTime, updateTime, lessonCount}
+                     defaultPaperSlots（计划默认专项卷位模板）, status, createTime, updateTime, lessonCount}
           lessons : [{id, planId, lessonSeq, title, lessonType('0'教学/'1'测试), tag, sourceRef,
                      thinkingAction, layerTarget（层数目标如 '2→3'）, parentCopy（家长版文案，🔴 家长可见、
                      无内部词）, kgNodeIds:[str]（🔴 课内锚点，直接喂 search_questions(subject_id=)）,
-                     segTemplate:[...]（🔴 分段蓝本：每段名/风格/分层规则，喂 build_prep_pack 的 segs 骨架）,
-                     prepState（备课态，由 pack.status 推导，'0'=未备）}]
+                     paperSlots:[{slot_seq,name,style,rules,note,paper_id,manual_ready}]（🔴 PRD-B-101 专项卷位蓝本：
+                     每卷位对应一张专项卷；空卷位=待组，逐卷位走 compose_paper/create_paper(lesson_id,slot_seq)）,
+                     paperSlotsInherited（true=继承自计划 default_paper_slots）,
+                     prepState（备课态，服务端按 paper_slots 推导：'0'未备/'1'备课中/'2'已备好）}]
         """
         try:
             return await _get_plan_detail(client, plan_id)

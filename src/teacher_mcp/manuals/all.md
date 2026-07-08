@@ -49,11 +49,11 @@
 | `create_teach_target` / `list_teach_targets` | 建/查教学对象（学生 target_type='student'→'0' / 班课 'class'→'1'） |
 | `upsert_course_plan(plan, lessons?)` | 建/改课程计划+课次（🔴 新建必传 target_id） |
 | `schedule_sessions` / `list_schedule` / `update_session` | 批量排课 / 查月历 / 改单场（改期/请假/取消/锁/改绑） |
-| `build_prep_pack(lesson_id/session_id, segs)` | 装配备课包（按段填题，question_ids 字符串） |
-| `render_prep_pack(pack_id)` | 备课包渲染 PDF（🔴 pack.status=备课状态唯一权威） |
+| `compose_paper` / `create_paper`(lesson_id,slot_seq) / `update_paper` | 逐卷位组卷：按大纲/按题 id 成卷（带 lesson_id+slot_seq→落【备课卷】+绑卷位）/ 算分值 |
+| `bind_paper_slot(lesson_id, slot_seq, action)` | 🔴 PRD-B-101 卷位管理（bind 绑既有卷 / unbind 解绑 / manual_ready 标已备好） |
 | `submit_review(session_id, item_results)` | 课后回收逐题对错→家长反馈+肖像增量 |
-| `get_student_profile` / `get_plan_detail` | 读对象画像/易错库 / 读计划课次蓝本（圈题依据） |
-| `compose_paper` / `create_paper` / `update_paper` | 按大纲组卷 / 按题 id 成卷 / 算分值 |
+| `get_student_profile` / `get_plan_detail` | 读对象画像/易错库 / 读计划课次蓝本（paperSlots 卷位=圈题依据） |
+| ~~`build_prep_pack` / `render_prep_pack`~~ | 🔴 PRD-B-101 已退役（备课=按卷位组卷；PDF 走平台前端导出，MCP 不再出 PDF），调用返退役指引 |
 
 **举一反三组（variant，toolkit 图，写变式题）**
 | 工具 | 何时用 |
@@ -74,7 +74,7 @@
 
 **② 成卷**：同 ①，但 `ingest_items` 带 `paper={name, category_id, total_score, suggest_time}` 一步成卷；或已入库题走 `create_paper(name, question_ids)` + `update_paper` 算分。回验卷内题数走 `search_questions(exam_paper_id=)` 或 DB。
 
-**③ 备课链**（顺序固定）：`create_teach_target`(student) → `upsert_course_plan`(挂 target_id, 建 lessons) → `schedule_sessions`(排场次, 绑 lesson) → `build_prep_pack`(段引用圈好的 qid) → `render_prep_pack` → 课后 `submit_review`。读侧 `get_plan_detail`/`get_student_profile` 提供圈题依据。
+**③ 备课链**（顺序固定，🔴 PRD-B-101 卷位模型）：`create_teach_target`(student) → `upsert_course_plan`(挂 target_id, 建 lessons，课次带 `paper_slots` 专项卷位) → `schedule_sessions`(排场次, 绑 lesson) → 逐卷位 `create_paper`/`compose_paper`(lesson_id+slot_seq→落【备课卷】+绑卷位) → [`bind_paper_slot` 管理绑定/标记] → 课后 `submit_review`。读侧 `get_plan_detail`(读 paperSlots)/`get_student_profile` 提供圈题依据。PDF 走平台前端导出（MCP 不再出 PDF）。
 
 **④ 举一反三**：`make_variants` → [need_confirm 则 `confirm_variant_chapter`] → `generate_variants` → `verify_variant`(verdict=pass) → [`edit_variant` 修] → [几何题 `compose_variant_figure`] → `persist_variants` 落库。无图题落库时后端自动渲 rendered_stem，无需处理。
 

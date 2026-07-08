@@ -15,7 +15,8 @@ PY = str(ROOT / ".venv" / "Scripts" / "python.exe")
 
 # 旧 .mcp.json 形态：command=python -m teacher_mcp.server + env TEACHER_MCP_ROLE
 # O-005 溯源增强：新增共享工具 my_recent_uploads，各角色视图 +1
-EXPECT = {"prep": 26, "ingest": 17, "lecture": 16, "variant": 15}
+# PRD-B-101（B 线移植）：新增 bind_paper_slot，仅 prep 视图 +1 → 27
+EXPECT = {"prep": 27, "ingest": 17, "lecture": 16, "variant": 15}
 
 
 @pytest.mark.asyncio

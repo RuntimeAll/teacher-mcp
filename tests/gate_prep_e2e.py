@@ -1,11 +1,15 @@
-"""G10（备课链 E2E）：MCP 工具走完整备课链，真库落对象/计划/场次/备课包。
+"""G10（备课链 E2E）：MCP 工具走完整备课链，真库落对象/计划/场次/备课卷（PRD-B-101 卷位模型）。
 
-链路：login → ingest_items(1 题带标记，供备课包引用) → create_teach_target(student)拿 target_id
-     → upsert_course_plan(挂该 target,1 lesson)拿 plan_id/lesson_id → schedule_sessions(排 1 场)
-     → list_schedule 断言该场在 → build_prep_pack(段引用标记题 qid)拿 pack_id
-     → get_plan_detail 断言 plan/lesson 链贯通。
-🔴 语义（记忆沉淀）：pack.status = 备课状态唯一权威；target_type 'student'→'0'；id 全链路字符串。
-产出对象（target/plan/session/pack）留库（名称带 [PRD-O-005-TEST]，无删除工具属预期），末尾打印 id 供清理。
+链路：login → ingest_items(1 题带标记，供组卷引用) → create_teach_target(student)拿 target_id
+     → upsert_course_plan(挂该 target,1 lesson，🔴 带 paper_slots 专项卷位)拿 plan_id/lesson_id
+     → schedule_sessions(排 1 场) → list_schedule 断言该场在
+     → create_paper(question_ids=[标记题], lesson_id+slot_seq=1)建【备课卷】即绑卷位 → 拿 paper_id
+     → bind_paper_slot(manual_ready)证工具可调、返回结构含 paper_slots
+     → get_plan_detail 断言 plan/lesson 链贯通 + 课次带 paperSlots。
+🔴 语义（PRD-B-101 移植）：课次内容模型 = paper_slots『专项卷位』（替代旧 seg_template/备课包）；
+   备课态服务端按 paper_slots 推导；组卷带 lesson_id+slot_seq → BE 自动落 paper_kind='2' + 绑卷位；
+   target_type 'student'→'0'；id 全链路字符串。
+产出对象（target/plan/session/paper）留库（名称带 [PRD-O-005-TEST]，无删除工具属预期），末尾打印 id 供清理。
 """
 import time
 
@@ -68,6 +72,14 @@ async def test_prep_chain_e2e():
                 "lesson_seq": 1,
                 "title": f"{MARK}第1课·有理数运算",
                 "lesson_type": "0",
+                # 🔴 PRD-B-101：课次专项卷位（替代旧 seg_template），逐卷位组卷绑于此
+                "paper_slots": [{
+                    "slot_seq": 1,
+                    "name": f"{MARK}课内同步卷",
+                    "style": "课内同步",
+                    "rules": "",
+                    "note": "",
+                }],
             }],
         })).data
         assert p.get("ok"), f"upsert_course_plan 失败: {p}"
@@ -111,28 +123,51 @@ async def test_prep_chain_e2e():
         assert session_id in sess_ids, (
             f"排出的场次 {session_id} 不在月历中: {sess_ids} | 原始 {sessions}")
 
-        # ── 5. 装配备课包（段引用标记题 qid）──
-        bp = (await c.call_tool("build_prep_pack", {
+        # ── 5. 逐卷位组卷：create_paper(lesson_id+slot_seq) 建【备课卷】即绑卷位 1（PRD-B-101 主路）──
+        cp = (await c.call_tool("create_paper", {
+            "name": f"{MARK}课内同步卷",
+            "question_ids": [int(qid)],
             "lesson_id": lesson_id,
-            "segs": [{
-                "name": f"{MARK}同步段",
-                "style": "课内同步",
-                "question_ids": [qid],
-            }],
+            "slot_seq": 1,
         })).data
-        assert bp.get("ok"), f"build_prep_pack 失败: {bp}"
-        pack_id = str(bp.get("pack_id"))
-        assert pack_id and pack_id != "None", f"未拿到 pack_id: {bp}"
+        assert cp.get("ok"), f"create_paper(备课卷绑卷位) 失败: {cp}"
+        paper_id = str(cp.get("paper_id"))
+        assert paper_id and paper_id != "None", f"未拿到 paper_id: {cp}"
 
-        # ── 6. get_plan_detail 断言 plan/lesson 链贯通 ──
+        # ── 5b. bind_paper_slot(manual_ready)：证工具可调 + 返回结构含 paper_slots ──
+        #   🔴 BE 能力探针：PRD-B-101 的 paper_slots/slot 端点仅在 B 线 BE；C 线 master-ai(:9090)
+        #   仅迁了 DB 列、未合并 Java 代码（CoursePlanService/Controller 仍 seg_template）。
+        #   命中 404「请求地址不存在」→ BE 未就绪，本 gate 端到端部分优雅 skip（MCP 层已就绪，待 BE merge）。
+        mr = (await c.call_tool("bind_paper_slot", {
+            "lesson_id": lesson_id,
+            "action": "manual_ready",
+            "ready": True,
+        })).data
+        if not mr.get("ok"):
+            err = str(mr.get("error", ""))
+            if "404" in err or "请求地址不存在" in err or "不存在" in err:
+                pytest.skip(
+                    "C 线 BE(:9090) 未合并 PRD-B-101 paper_slots/slot 端点（仅 DB 列已迁移）；"
+                    "MCP 层移植已就绪，待 BE 从 B 线合并后本 gate 转真端到端。"
+                    f"（bind_paper_slot 探针返回: {mr}；已建 target={target_id} plan={plan_id} "
+                    f"lesson={lesson_id} session={session_id} paper={paper_id}）")
+            assert False, f"bind_paper_slot(manual_ready) 失败(非 BE 缺失): {mr}"
+        # 成功路径才校验 MCP 层返回契约（error 路径无这两个键）
+        assert "paper_slots" in mr and "prep_state" in mr, (
+            f"bind_paper_slot 返回结构缺 paper_slots/prep_state 字段（MCP 层契约）: {mr}")
+
+        # ── 6. get_plan_detail 断言 plan/lesson 链贯通 + 课次带 paperSlots ──
         gd = (await c.call_tool("get_plan_detail", {"plan_id": plan_id})).data
         assert gd.get("ok"), f"get_plan_detail 失败: {gd}"
         plan = gd.get("plan") or {}
         lessons = gd.get("lessons") or []
         assert str(plan.get("id")) == plan_id, f"plan.id 不符: {plan}"
-        detail_lesson_ids = {str(x.get("id")) for x in lessons if isinstance(x, dict)}
-        assert lesson_id in detail_lesson_ids, (
-            f"课次 {lesson_id} 不在计划明细中: {detail_lesson_ids}")
+        detail_lessons = {str(x.get("id")): x for x in lessons if isinstance(x, dict)}
+        assert lesson_id in detail_lessons, (
+            f"课次 {lesson_id} 不在计划明细中: {set(detail_lessons)}")
+        my_lesson = detail_lessons[lesson_id]
+        slots = my_lesson.get("paperSlots") or my_lesson.get("paper_slots") or []
+        assert slots, f"课次 {lesson_id} 未回读到 paperSlots（PRD-B-101 卷位模型）: {my_lesson}"
 
         print(f"G10 PASS 链: target={target_id} plan={plan_id} lesson={lesson_id} "
-              f"session={session_id} pack={pack_id} qid={qid}")
+              f"session={session_id} paper={paper_id} qid={qid} prep_state={mr.get('prep_state')}")

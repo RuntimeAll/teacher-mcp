@@ -13,6 +13,8 @@ SHARED = {"login", "list_kg_tree", "resolve_kg", "search_questions", "get_questi
 HEALTH = {"health_check"}
 # PRD-O-005 溯源增强：新增共享工具（进所有角色视图，各 +1）
 NEW_SHARED = {"my_recent_uploads"}
+# PRD-B-101（B 线移植）：新增备课组工具（仅进 prep 视图，prep/all 各 +1；build/render_prep_pack 退役但留 stub 不减数）
+NEW_PREP = {"bind_paper_slot"}
 
 # 非共享·录入组（旧 ingest 组新增 9）
 INGEST_ONLY = {"format_question", "upload_image", "ingest_question", "ingest_items", "verify_ingest",
@@ -44,10 +46,11 @@ def test_baseline_is_34():
 
 @pytest.mark.asyncio
 async def test_role_all():
-    # 批3 起 all 纳入举一反三 7 工具；O-005 溯源增强 +my_recent_uploads：34 ∪ health ∪ variant7 ∪ new_shared = 43
+    # 批3 起 all 纳入举一反三 7 工具；O-005 溯源增强 +my_recent_uploads；PRD-B-101 +bind_paper_slot：
+    # 34 ∪ health ∪ variant7 ∪ new_shared ∪ new_prep = 44
     names = await _names("all")
     assert ALL_34 <= names  # G1：⊇ 旧 34
-    assert names == ALL_34 | HEALTH | VARIANT_ONLY | NEW_SHARED  # 43
+    assert names == ALL_34 | HEALTH | VARIANT_ONLY | NEW_SHARED | NEW_PREP  # 44
 
 
 @pytest.mark.asyncio
@@ -62,7 +65,8 @@ async def test_role_lecture():
 
 @pytest.mark.asyncio
 async def test_role_prep():
-    assert await _names("prep") == SHARED | PREP_ONLY | HEALTH | NEW_SHARED  # 26 = 旧25 +1
+    # PRD-B-101 +bind_paper_slot：27 = 旧25 +my_recent_uploads +bind_paper_slot
+    assert await _names("prep") == SHARED | PREP_ONLY | HEALTH | NEW_SHARED | NEW_PREP  # 27
 
 
 @pytest.mark.asyncio
