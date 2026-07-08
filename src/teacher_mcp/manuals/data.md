@@ -36,6 +36,8 @@
 | `login(username, password)` | 真账号登录注入身份（token 不回吐明文） |
 | `list_kg_tree()` | 查整棵知识点树（组卷选叶子用） |
 | `resolve_kg(subject_root, query?, section_num?, parent_id?, leaves_only?, limit?)` | 🔴 锚定查表（数学+科学通吃）：按名称/节号查节点。**叶子=`is_leaf`（无子节点），不按 level 判**（科学 901 树 5 层、902-906 树 4 层，叶深不一）。返回 `{ok,count,nodes:[{id,name,level,parent_id,is_leaf}]}` |
+| `search_questions(..., batch_id?, since?)` | 检索题库；给 `batch_id`/`since` 走 DB **找回路径**（不依赖 stem 关键词，不漏变式题） |
+| `my_recent_uploads(hours?)` | 🔎 一键找回本人近 N 小时录的 题（按批次分组）/卷/讲义 |
 | `health_check()` | 探活三依赖（ruoyi BE / toolkit / MySQL），任何异常算 down 不抛 |
 
 ## 转换（确定性预处理，无需 login、零落库）
@@ -60,6 +62,20 @@
 |---|---|
 | `label_question(...)` | 已入库题的 DNA 深打标（难度/锚/解法骨架/变式底料） |
 | `compose_paper` / `create_paper` / `update_paper` | 组卷 / 按题 id 成卷 / 算分值 |
+
+## 溯源与找回（PRD-O-005 溯源增强）
+
+**双管道来源标记**：MCP 机录一律打 `import_source="mcp-<角色>"`（`mcp-ingest`/`mcp-data`/`mcp-all`，前缀取 env `TEACHER_MCP_ROLE`）。
+🔴 语义 = **不带 `mcp-` 前缀**的 `import_source`（`main`/手工导入/`textin`…）= 手工/其他管道；`举一反三` = 引擎落库的变式（勿动）。
+
+**批次号**：`ingest_items` / `ingest_question` 每次调用生成一个 `batch_id`（`mcp-YYYYMMDD-HHMMSS-4位随机`），每题落 `import_batch_id`。
+录完记住返回的 `batch_id` → `search_questions(batch_id="mcp-…")` 精确捞回本批全部题。
+
+**找回两路**：
+- `search_questions(batch_id=… )` 或 `search_questions(since="24h"/"7d"/"2026-07-08", mine=True)`——DB 只读，**不走 stem LIKE**（变式题 stem_text=NULL 也不漏），items 附 `import_source`/`batch_id`/`create_time`。
+- `my_recent_uploads(hours=24)`——本人窗口内 题（按 `batch_id` 分组）+卷+讲义片段一把捞，附题库页 `view_url`。
+
+**录入尽量带来源三要素**：`source_type` + `exam_year` + `region_code` + `source_raw`，让每题除了「谁录的」还答得出「从哪来的」。
 
 ---
 
@@ -96,7 +112,8 @@
 }
 // PaperSpec（可选；不给=散题不成卷）
 { "name": "卷名", "category_id": "卷库目录节点id", "total_score": 100, "suggest_time": 40 }
-// 返回：{ok, results:[{num, question_id, created, warnings?, reason?}], paper_id?, stats:{ok,reused,fail,img}, view_url?, note?}
+// 返回：{ok, batch_id, import_source, results:[{num, question_id, created, warnings?, reason?}], paper_id?, stats:{ok,reused,fail,img}, view_url?, note?}
+//   🔴 batch_id = 本批溯源批次号；记住它，日后 search_questions(batch_id=) / my_recent_uploads 找回
 ```
 
 **去重（AC4）**：`external_key` 命中已存在题干 → 复用既有 qid、`created=false`、图 0 传。

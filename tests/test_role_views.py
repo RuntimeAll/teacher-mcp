@@ -11,6 +11,8 @@ from teacher_mcp.server import build_server
 # ── 兼容基线（旧 34 名单，按 shared/group 分块）──
 SHARED = {"login", "list_kg_tree", "resolve_kg", "search_questions", "get_question", "get_role_manual"}
 HEALTH = {"health_check"}
+# PRD-O-005 溯源增强：新增共享工具（进所有角色视图，各 +1）
+NEW_SHARED = {"my_recent_uploads"}
 
 # 非共享·录入组（旧 ingest 组新增 9）
 INGEST_ONLY = {"format_question", "upload_image", "ingest_question", "ingest_items", "verify_ingest",
@@ -42,37 +44,37 @@ def test_baseline_is_34():
 
 @pytest.mark.asyncio
 async def test_role_all():
-    # 批3 起 all 视图纳入举一反三 7 工具：34 ∪ health ∪ variant7 = 42（仍 ⊇ 旧 34，G1 兼容）
+    # 批3 起 all 纳入举一反三 7 工具；O-005 溯源增强 +my_recent_uploads：34 ∪ health ∪ variant7 ∪ new_shared = 43
     names = await _names("all")
     assert ALL_34 <= names  # G1：⊇ 旧 34
-    assert names == ALL_34 | HEALTH | VARIANT_ONLY  # 42
+    assert names == ALL_34 | HEALTH | VARIANT_ONLY | NEW_SHARED  # 43
 
 
 @pytest.mark.asyncio
 async def test_role_ingest():
-    assert await _names("ingest") == SHARED | INGEST_ONLY | HEALTH  # 16 = 旧15 ∪ health
+    assert await _names("ingest") == SHARED | INGEST_ONLY | HEALTH | NEW_SHARED  # 17 = 旧16 +1
 
 
 @pytest.mark.asyncio
 async def test_role_lecture():
-    assert await _names("lecture") == SHARED | LECTURE_ONLY | HEALTH  # 15 = 旧14 ∪ health
+    assert await _names("lecture") == SHARED | LECTURE_ONLY | HEALTH | NEW_SHARED  # 16 = 旧15 +1
 
 
 @pytest.mark.asyncio
 async def test_role_prep():
-    assert await _names("prep") == SHARED | PREP_ONLY | HEALTH  # 25 = 旧24 ∪ health
+    assert await _names("prep") == SHARED | PREP_ONLY | HEALTH | NEW_SHARED  # 26 = 旧25 +1
 
 
 @pytest.mark.asyncio
 async def test_role_data():
-    # data == ingest ∪ lecture ∪ {health_check}
-    assert await _names("data") == SHARED | INGEST_ONLY | LECTURE_ONLY | HEALTH  # 21
+    # data == ingest ∪ lecture ∪ {health_check} ∪ new_shared
+    assert await _names("data") == SHARED | INGEST_ONLY | LECTURE_ONLY | HEALTH | NEW_SHARED  # 22 = 旧21 +1
 
 
 @pytest.mark.asyncio
 async def test_role_variant():
-    # 批3 落地：variant 视图 = shared6 ∪ health ∪ 7 个举一反三工具 = 14
-    assert await _names("variant") == SHARED | HEALTH | VARIANT_ONLY  # 14
+    # variant 视图 = shared6 ∪ health ∪ 7 举一反三 ∪ new_shared = 15（旧14 +1）
+    assert await _names("variant") == SHARED | HEALTH | VARIANT_ONLY | NEW_SHARED  # 15
 
 
 @pytest.mark.asyncio

@@ -4,6 +4,8 @@ get_role_manual + health_check。全角色可见（tags={"shared"}）。
 PRD-O-005 重建：单 client（A/C 已合并 :9090）；题库读侧（search/get）从旧 qbank.py 平移进本文件。
 get_role_manual 改读 src/teacher_mcp/manuals/<role>.md（role 缺省跟随 TEACHER_MCP_ROLE）。
 """
+import re
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -115,6 +117,37 @@ def _as_long(v):
         return int(str(v))
     except (TypeError, ValueError):
         return None
+
+
+# ───────────────────────── 溯源找回（PRD-O-005）辅助 ─────────────────────────
+def _parse_since(s: str):
+    """解析 since：'24h'/'7d'（相对当下）或 ISO 日期（'2026-07-08' / '2026-07-08 12:00:00'）。
+    返回 datetime cutoff；无法解析 → None。"""
+    s = (s or "").strip()
+    if not s:
+        return None
+    m = re.fullmatch(r"(\d+)\s*([hHdD])", s)
+    if m:
+        n, unit = int(m.group(1)), m.group(2).lower()
+        return datetime.now() - (timedelta(hours=n) if unit == "h" else timedelta(days=n))
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _map_recall_item(row: dict) -> dict:
+    """DB 找回行 → 与 _map_item 同 shape（stem NULL 的变式题用占位不丢行）+ 附溯源三键。"""
+    d = dict(row)
+    if not d.get("stemText"):
+        d["stemText"] = "(富文本题面)"
+    item = _map_item(d)
+    item["import_source"] = row.get("importSource")
+    item["batch_id"] = row.get("importBatchId")
+    item["create_time"] = row.get("createTime")
+    return item
 
 
 async def _search_questions(client, subject_id="", question_type=None, difficult=None,
@@ -247,9 +280,16 @@ def register(mcp, client: RuoyiClient, default_role: str = "data") -> None:
         subject_id: str = "", question_type: int = None, difficult: int = None,
         keyword: str = "", mine: bool = False, exam_paper_id: str = None,
         label_status: int = None, pattern_id: str = None,
+        batch_id: str = "", since: str = "",
         page_index: int = 1, page_size: int = 20,
     ) -> dict:
         """从题库分页检索题目（备课圈题核心）→ POST /teacher/question/page。返回 {ok, total, items}。
+
+        🔴 快速找回路径（PRD-O-005 溯源增强）：给 batch_id 或 since 任一 → 改走 backends/db 只读检索
+           （按 import_batch_id / create_time / create_user 查，**不依赖 stem LIKE**，故不漏 stem_text=NULL
+           的变式题），可与 mine/subject_id/question_type/difficult 组合。返回 items 附 import_source/batch_id/create_time。
+           - batch_id: 精确批次号（ingest_items/ingest_question 返回的 batch_id，如 mcp-20260708-...）
+           - since   : 时间窗，'24h'/'7d' 或 ISO 日期（'2026-07-08'）；mine=True 限本人。
 
         🔴 subject_id 语义 = **前缀子树匹配**：传章节/课时的 biz_subject 节点 id → 召回该节点下
            **整棵子树**所有知识点的题（likeRight 前缀）；传叶子 id → 只该叶子的题。非数字 id → BE 静默返空集。
@@ -274,12 +314,81 @@ def register(mcp, client: RuoyiClient, default_role: str = "data") -> None:
         """
         if not client.has_session():
             return {"ok": False, "error": "需先 login"}
+        # ── 快速找回路径：batch_id / since 任一给出 → DB 只读检索（绕 stem LIKE，不漏变式题）──
+        if batch_id or since:
+            since_dt = None
+            if since:
+                since_dt = _parse_since(since)
+                if since_dt is None:
+                    return {"ok": False, "error": f"since 无法解析：{since}（用 24h/7d 或 ISO 日期 2026-07-08）"}
+            from teacher_mcp.backends import db
+            try:
+                rows = db.recent_questions(
+                    uid=client.user_id, batch_id=batch_id, since_dt=since_dt, mine=mine,
+                    subject_id=subject_id, question_type=question_type, difficult=difficult,
+                    limit=int(page_size), offset=(int(page_index) - 1) * int(page_size))
+            except Exception as e:
+                return {"ok": False, "error": f"找回检索失败: {type(e).__name__}: {e}"}
+            items = [_map_recall_item(r) for r in rows]
+            return {"ok": True, "total": len(items), "items": items, "recall": True}
         try:
             return await _search_questions(client, subject_id, question_type, difficult, keyword,
                                            mine, exam_paper_id, label_status, pattern_id,
                                            page_index, page_size)
         except RuoyiError as e:
             return {"ok": False, "error": str(e)}
+
+    @mcp.tool(tags={"shared"})
+    async def my_recent_uploads(hours: int = 24) -> dict:
+        """一键找回当前登录老师在最近时间窗内录的东西（题 / 卷 / 讲义片段）——DB 只读，不依赖 stem 关键词。
+
+        用途：老师刚用 MCP 录完一批题/组完卷/存完讲义，想快速核对「我刚才录进去了啥」。
+        参数: hours 时间窗（默认 24 小时；<1 视为 1）。
+        返回:
+          {ok, hours,
+           questions: {total, batches:[{batch_id, import_source, count, items:[{id, stem_head(30字/占位),
+                       import_source, batch_id, create_time}]}]}   # 按录入批次分组，倒序
+           papers: [{id, name, question_count, create_time}]        # biz_paper 同窗口本人建的卷
+           lecture_frags: [{id, title, create_time}]                # biz_kg_lecture_frag 同窗口本人 owner 的片段
+           view_url}                                                # 题库页深链，供浏览器核对
+        🔴 双管道语义：import_source 带 "mcp-" 前缀 = MCP 机录；'举一反三'=引擎落库；其余=手工/其他管道。
+        """
+        if not client.has_session():
+            return {"ok": False, "error": "需先 login"}
+        uid = client.user_id
+        if uid is None:
+            return {"ok": False, "error": "会话无 user_id，请重新 login"}
+        cutoff = datetime.now() - timedelta(hours=max(1, int(hours)))
+        from teacher_mcp.backends import db
+        try:
+            qrows = db.recent_questions(uid=uid, since_dt=cutoff, mine=True, limit=500)
+            papers = db.recent_papers(uid, cutoff)
+            frags = db.recent_lecture_frags(uid, cutoff)
+        except Exception as e:
+            return {"ok": False, "error": f"找回失败: {type(e).__name__}: {e}"}
+        # 题按批次分组（保留首见顺序 = 时间倒序）
+        batches: dict = {}
+        for r in qrows:
+            bkey = r.get("importBatchId") or "(无批次)"
+            g = batches.get(bkey)
+            if g is None:
+                g = {"batch_id": r.get("importBatchId"), "import_source": r.get("importSource"),
+                     "count": 0, "items": []}
+                batches[bkey] = g
+            g["count"] += 1
+            head = (r.get("stemText") or "")[:30] or "(富文本题面)"
+            g["items"].append({
+                "id": r.get("id"), "stem_head": head, "import_source": r.get("importSource"),
+                "batch_id": r.get("importBatchId"), "create_time": r.get("createTime"),
+            })
+        return {
+            "ok": True,
+            "hours": hours,
+            "questions": {"total": len(qrows), "batches": list(batches.values())},
+            "papers": papers,
+            "lecture_frags": frags,
+            "view_url": "http://localhost:9091/question/index",
+        }
 
     @mcp.tool(tags={"shared"})
     async def get_question(ids: list) -> dict:

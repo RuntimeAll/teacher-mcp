@@ -14,7 +14,8 @@ ROOT = Path(__file__).resolve().parent.parent
 PY = str(ROOT / ".venv" / "Scripts" / "python.exe")
 
 # 旧 .mcp.json 形态：command=python -m teacher_mcp.server + env TEACHER_MCP_ROLE
-EXPECT = {"prep": 25, "ingest": 16, "lecture": 15, "variant": 14}
+# O-005 溯源增强：新增共享工具 my_recent_uploads，各角色视图 +1
+EXPECT = {"prep": 26, "ingest": 17, "lecture": 16, "variant": 15}
 
 
 @pytest.mark.asyncio

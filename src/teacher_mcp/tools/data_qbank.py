@@ -7,7 +7,11 @@ PRD-O-005 重建：合并旧 app/tools/{convert,ingest,label}.py 三文件；单
 🔴 register(mcp, client)：所有工具收单 client（A/C 已合并）。
 """
 import json
+import os
+import random
+import string
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -25,6 +29,26 @@ from teacher_mcp.tools.prep import _standard_scores
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
 WORK = ROOT / ".paper_work"
 IMGDIR = ROOT / ".paper_imgs"
+
+
+# ───────────────────── 双管道来源标记（PRD-O-005 溯源增强）─────────────────────
+# 语义：MCP 机录一律打 import_source = "mcp-<角色>"（mcp-ingest/mcp-data/mcp-all…），
+#       批次号 import_batch_id = "mcp-YYYYMMDD-HHMMSS-4位随机"（可读可排序）。
+# 🔴 不带 "mcp-" 前缀的 import_source（main / 手工导入 / '举一反三'引擎…）= 其他/手工管道。
+def _mcp_role() -> str:
+    """当前连接角色（server 按 env TEACHER_MCP_ROLE 分视图；缺省 all）。"""
+    return (os.getenv("TEACHER_MCP_ROLE", "all") or "all").strip().lower() or "all"
+
+
+def _mcp_source() -> str:
+    return "mcp-" + _mcp_role()
+
+
+def _gen_batch_id() -> str:
+    """生成本次录入批次号：mcp-YYYYMMDD-HHMMSS-4位随机（可读、按时间可排序、跨调用唯一）。"""
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    rnd = "".join(random.choices(string.ascii_lowercase + string.digits, k=4))
+    return f"mcp-{ts}-{rnd}"
 
 
 # ───────────────────── 录题结构（平移自 ingest.py）─────────────────────
@@ -263,8 +287,10 @@ def register(mcp, client: RuoyiClient) -> None:
         source_type: int = 0,
         source_raw: str = "",
         status: str = "1",
+        import_source: str = "",
+        import_batch_id: str = "",
     ) -> dict:
-        """录一道题入库（事务多表），归属当前登录 teacher。返回 {ok, question_id, created}。
+        """录一道题入库（事务多表），归属当前登录 teacher。返回 {ok, question_id, created, import_source, batch_id}。
 
         参数（NOT NULL=必填）:
           subject_id  : 科目锚 level1（年级根，如 数学七上 的根 id），NOT NULL
@@ -277,12 +303,17 @@ def register(mcp, client: RuoyiClient) -> None:
           images      : 题图 [{ossUrl, assetId, role, ...}]（来自 upload_image）
           external_key: 幂等键（book+节+课时+题号），去重；空则按 stem_text hash 去重
           status      : '0'草稿 / '1'发布（默认发布）
+          import_source: 双管道来源标记；空则自动打 "mcp-<角色>"（MCP 机录，与手工/其他管道可区分）
+          import_batch_id: 录入批次号；空则自动生成 mcp-YYYYMMDD-HHMMSS-4位随机
+        🔴 双管道语义：不带 "mcp-" 前缀的 import_source（main/手工导入/'举一反三'引擎…）= 其他/手工管道。
         异常: 底座报错 → {ok:false, reason}（不假成功）。
         """
         if not client.has_session():
             return {"ok": False, "reason": "需先 login"}
         if not (subject_id and stem_text):
             return {"ok": False, "reason": "subject_id 与 stem_text 必填"}
+        src = import_source or _mcp_source()
+        bid = import_batch_id or _gen_batch_id()
 
         body = {
             "subjectId": subject_id,
@@ -311,6 +342,8 @@ def register(mcp, client: RuoyiClient) -> None:
             body["sourceType"] = source_type            # 类型 1中考/2模拟/3期末/4月考/5单元/6自编/9其他
         if source_raw:
             body["sourceRaw"] = source_raw
+        body["importSource"] = src            # 双管道来源标记（BE IngestServiceImpl 直落）
+        body["importBatchId"] = bid           # 批次号（BE 直落 import_batch_id）
 
         try:
             resp = await client.teacher_post("/teacher/ingest/question", body)
@@ -320,7 +353,8 @@ def register(mcp, client: RuoyiClient) -> None:
         qid = resp.get("questionId")
         if not qid:
             return {"ok": False, "reason": "录题接口未返回 questionId", "raw": resp}
-        return {"ok": True, "question_id": qid, "created": resp.get("created")}
+        return {"ok": True, "question_id": qid, "created": resp.get("created"),
+                "import_source": src, "batch_id": bid}
 
     @mcp.tool(tags={"data", "ingest", "prep"})
     async def ingest_items(
@@ -338,7 +372,11 @@ def register(mcp, client: RuoyiClient) -> None:
           subject_root: KG 教材根（数学七上="100"；科学="901".."906"）——无 kp_id 的题 subject_id 落此根
           paper: 可选建卷 {name, category_id, total_score, suggest_time}；null=散题不成卷
         前置信息原样落库不被覆盖（AC3）；同题干重复录入自动去重复用（AC4）。
-        返回: {ok, results:[{num, question_id, created, reason?, warnings?}], paper_id?, stats:{ok,reused,fail,img}, view_url?}。
+        🔴 双管道来源标记（PRD-O-005 溯源增强）：本调用自动生成一个批次号，每题打
+           import_source="mcp-<角色>"（MCP 机录）+ import_batch_id=该批次号。录完记住返回的 batch_id，
+           日后 search_questions(batch_id=…) 或 my_recent_uploads() 一键找回。
+           不带 "mcp-" 前缀的 import_source（main/手工导入/'举一反三'引擎…）= 其他/手工管道。
+        返回: {ok, batch_id, results:[{num, question_id, created, reason?, warnings?}], paper_id?, stats:{ok,reused,fail,img}, view_url?}。
         """
         if not client.has_session():
             return {"ok": False, "reason": "需先 login"}
@@ -352,6 +390,9 @@ def register(mcp, client: RuoyiClient) -> None:
         ok_qids: list[tuple[int, float]] = []      # (qid, item.score) 按成功序，供成卷+分值
         labeled_records: list[dict] = []           # {question_id, models, new_models} 批尾串行写模型链
         batch_key = (paper.name if paper else "") or f"items-{subject_root}"
+        # ── 双管道来源标记：本批一个批次号，每题打 mcp-<角色> + 该批次号 ──
+        import_source = _mcp_source()
+        batch_id = _gen_batch_id()
 
         for idx, it in enumerate(items, 1):
             warnings: list[str] = []
@@ -449,6 +490,8 @@ def register(mcp, client: RuoyiClient) -> None:
                     source_type=it.source_type,
                     source_raw=source_raw,
                     status="1",
+                    import_source=import_source,
+                    import_batch_id=batch_id,
                 )
                 if not ing.get("ok"):
                     n_fail += 1
@@ -525,6 +568,8 @@ def register(mcp, client: RuoyiClient) -> None:
 
         out = {
             "ok": n_fail == 0,
+            "batch_id": batch_id,          # 🔴 记住它：search_questions(batch_id=)/my_recent_uploads 找回
+            "import_source": import_source,
             "results": results,
             "stats": {"ok": n_ok, "reused": n_reused, "fail": n_fail, "img": n_img},
         }

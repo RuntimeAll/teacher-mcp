@@ -15,16 +15,17 @@ from teacher_mcp.tools import variant as tool_variant
 
 SHARED = {"login", "list_kg_tree", "resolve_kg", "search_questions", "get_question", "get_role_manual"}
 HEALTH = {"health_check"}
+NEW_SHARED = {"my_recent_uploads"}  # O-005 溯源增强新增共享工具
 VARIANT_ONLY = {"make_variants", "confirm_variant_chapter", "generate_variants",
                 "verify_variant", "edit_variant", "compose_variant_figure", "persist_variants"}
 
 
 @pytest.mark.asyncio
 async def test_variant_view_toolset():
-    """variant 角色视图 == shared6 ∪ health ∪ 7 variant（= 14）。"""
+    """variant 角色视图 == shared6 ∪ health ∪ 7 variant ∪ new_shared（= 15）。"""
     async with Client(build_server("variant")) as c:
         names = {t.name for t in await c.list_tools()}
-    assert names == SHARED | HEALTH | VARIANT_ONLY
+    assert names == SHARED | HEALTH | VARIANT_ONLY | NEW_SHARED
 
 
 def _mini_server(toolkit_client):

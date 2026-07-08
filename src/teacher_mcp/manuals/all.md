@@ -10,17 +10,18 @@
 
 ---
 
-## 角色 / 工具地图（42 工具，按组一行一句「何时用」）
+## 角色 / 工具地图（43 工具，按组一行一句「何时用」）
 
-**共享组（全角色可见，6 + health）**
+**共享组（全角色可见，7 + health）**
 | 工具 | 何时用 |
 |---|---|
 | `login` | 开场，注入身份 |
 | `health_check` | 开场/报错时探活三依赖 |
 | `list_kg_tree` | 要看整棵知识点树、选组卷叶子 |
 | `resolve_kg(subject_root, query?…)` | 🔴 锚定查真实叶子 id（叶子=is_leaf，不按 level 判）——kp_id 从这来 |
-| `search_questions(...)` | 从题库分页检索题（备课圈题；🔴 圈自己造的题必 mine=True） |
+| `search_questions(...)` | 从题库分页检索题（备课圈题；🔴 圈自己造的题必 mine=True）；给 `batch_id`/`since` 走**找回路径** |
 | `get_question(ids)` | 按 id 拉题详情（装段/核对题面前必看） |
+| `my_recent_uploads(hours?)` | 🔎 一键找回本人近 N 小时录的 题/卷/讲义（按批次分组） |
 | `get_role_manual(role?)` | 取角色手册全文 |
 
 **录题组（data/ingest，写题库）**
@@ -76,6 +77,27 @@
 **③ 备课链**（顺序固定）：`create_teach_target`(student) → `upsert_course_plan`(挂 target_id, 建 lessons) → `schedule_sessions`(排场次, 绑 lesson) → `build_prep_pack`(段引用圈好的 qid) → `render_prep_pack` → 课后 `submit_review`。读侧 `get_plan_detail`/`get_student_profile` 提供圈题依据。
 
 **④ 举一反三**：`make_variants` → [need_confirm 则 `confirm_variant_chapter`] → `generate_variants` → `verify_variant`(verdict=pass) → [`edit_variant` 修] → [几何题 `compose_variant_figure`] → `persist_variants` 落库。无图题落库时后端自动渲 rendered_stem，无需处理。
+
+---
+
+## 🔎 溯源与找回（PRD-O-005 溯源增强）
+
+**双管道语义（看 `import_source` 一眼分清谁录的）**
+- `mcp-*`（`mcp-ingest`/`mcp-data`/`mcp-all`…）= **MCP agent 机录**（本 server 录题一律打，前缀取 env `TEACHER_MCP_ROLE`）。
+- `举一反三` = 举一反三**引擎**落库的变式（toolkit 自带，勿动）。
+- 其余（`main`/手工导入/`textin`…，**不带 `mcp-` 前缀**）= 手工 / 其他管道。
+
+**批次号（一次录入一个 `batch_id`）**
+- `ingest_items` / `ingest_question` 每次调用返回 `batch_id`（格式 `mcp-YYYYMMDD-HHMMSS-4位随机`，可读可排序）。
+- 🔴 录完记住这个 `batch_id` → `search_questions(batch_id="mcp-…")` 精确捞回本批全部题（BE 直落 `import_batch_id`）。
+
+**两条找回路径**
+- `search_questions(batch_id=…)` 或 `search_questions(since="24h"/"7d"/"2026-07-08", mine=True)`：走 DB 只读检索，
+  **不依赖 stem 关键词**（故 stem_text=NULL 的变式题也不漏），返回 items 附 `import_source`/`batch_id`/`create_time`。
+- `my_recent_uploads(hours=24)`：一把捞回本人窗口内的 **题（按批次分组）+ 卷 + 讲义片段**，附题库页 `view_url`。
+
+**录入尽量带来源三要素**：`source_type`（1中考/2模拟/3期末/4月考/5单元/6自编/9其他）+ `exam_year` + `region_code`（国标6位）+ `source_raw`，
+让每题除了「谁录的（import_source）」还答得出「从哪来的」，日后可溯可筛。
 
 ---
 

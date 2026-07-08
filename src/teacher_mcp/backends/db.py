@@ -5,6 +5,7 @@
   ② biz_question_ai.difficulty_reason（why 难度依据；IngestAiBo 无此字段位）
   ③ biz_paper.subject_id 卷目录补设（page() 按它筛目录，/create 不设）
   ④ biz_subject 只读查表（resolve_kg 锚定）
+  ⑤ 溯源找回只读检索（recent_questions/papers/lecture_frags；HTTP page 无 batch/create_user 维度）
 其余（题/图/知识点关系/DNA blob/难度）一律走 RuoYi HTTP。
 🔴 技术债显式挂账：对外开放（stdio→HTTP）前须 HTTP 化（A 线补端点，独立卡）。
 🔴 凭据从 .env 读（config.Settings），dev 默认 root/123456@127.0.0.1:3307/ai_lesson_prep。
@@ -156,6 +157,97 @@ def question_image_url(question_id):
     finally:
         c.close()
     return row[0] if row else None
+
+
+# ───────────────────────── ⑤ 溯源找回（只读，PRD-O-005 溯源增强）─────────────────────────
+# 双管道语义：import_source 以 'mcp-' 前缀 = MCP 机录（mcp-ingest/mcp-data/mcp-all…）；
+# 不带 mcp- 前缀（main/手工导入/'举一反三'引擎…）= 其他管道。按 import_batch_id / create_time /
+# create_user 只读检索，不依赖 stem LIKE（变式题 stem_text 常 NULL，关键词搜漏它们）。
+
+def recent_questions(uid=None, batch_id="", since_dt=None, mine=False,
+                     subject_id="", question_type=None, difficult=None,
+                     limit=100, offset=0):
+    """按 import_batch_id / create_time / create_user 只读检索题（快速找回刚录的题；不走 stem LIKE）。
+    过滤项任意组合：batch_id（精确批次）/ since_dt（create_time>=）/ mine（create_user=uid）/
+    subject_id（前缀子树 LIKE）/ question_type / difficult。按 create_time 倒序。
+    返回 [{id, questionType, difficult, subjectId, stemText, stemImg, status, labelStatus,
+    examPaperName, createUser, importSource, importBatchId, createTime}]（camelCase 供 _map_item 复用）。
+    🔴 只读，挂账同本模块头注释。"""
+    conds, args = ["1=1"], []
+    if batch_id:
+        conds.append("import_batch_id=%s")
+        args.append(str(batch_id))
+    if since_dt is not None:
+        conds.append("create_time>=%s")
+        args.append(since_dt)
+    if mine and uid is not None:
+        conds.append("create_user=%s")
+        args.append(int(uid))
+    if subject_id:
+        conds.append("CAST(subject_id AS CHAR) LIKE %s")
+        args.append(str(subject_id) + "%")
+    if question_type is not None:
+        conds.append("question_type=%s")
+        args.append(int(question_type))
+    if difficult is not None:
+        conds.append("difficult=%s")
+        args.append(int(difficult))
+    sql = ("SELECT CAST(id AS CHAR), question_type, difficult, CAST(subject_id AS CHAR),"
+           " stem_text, stem_img_url, status, label_status, exam_paper_name, create_user,"
+           " import_source, import_batch_id, create_time FROM biz_question"
+           f" WHERE {' AND '.join(conds)} ORDER BY create_time DESC, id DESC LIMIT %s OFFSET %s")
+    args += [int(limit), int(offset)]
+    c = conn()
+    try:
+        with c.cursor() as cur:
+            cur.execute(sql, args)
+            rows = cur.fetchall()
+    finally:
+        c.close()
+    out = []
+    for r in rows:
+        out.append({
+            "id": r[0], "questionType": r[1], "difficult": r[2], "subjectId": r[3],
+            "stemText": r[4], "stemImg": r[5], "status": r[6], "labelStatus": r[7],
+            "examPaperName": r[8], "createUser": r[9],
+            "importSource": r[10], "importBatchId": r[11],
+            "createTime": r[12].strftime("%Y-%m-%d %H:%M:%S") if r[12] else None,
+        })
+    return out
+
+
+def recent_papers(uid, since_dt, limit=50):
+    """当前 uid 时间窗内创建的卷（biz_paper.create_by=str(uid)，字符串 uid）。
+    返回 [{id, name, question_count, create_time}]。只读。"""
+    c = conn()
+    try:
+        with c.cursor() as cur:
+            cur.execute(
+                "SELECT CAST(id AS CHAR), name, question_count, create_time FROM biz_paper"
+                " WHERE create_by=%s AND create_time>=%s ORDER BY create_time DESC LIMIT %s",
+                (str(uid), since_dt, int(limit)))
+            rows = cur.fetchall()
+    finally:
+        c.close()
+    return [{"id": r[0], "name": r[1], "question_count": r[2],
+             "create_time": r[3].strftime("%Y-%m-%d %H:%M:%S") if r[3] else None} for r in rows]
+
+
+def recent_lecture_frags(uid, since_dt, limit=50):
+    """当前 uid 时间窗内录的讲义片段（biz_kg_lecture_frag.owner_id=uid，整型 uid）。
+    该表有 owner_id + create_time 列，故支持时间窗找回。返回 [{id, title, create_time}]。只读。"""
+    c = conn()
+    try:
+        with c.cursor() as cur:
+            cur.execute(
+                "SELECT CAST(id AS CHAR), title, create_time FROM biz_kg_lecture_frag"
+                " WHERE owner_id=%s AND create_time>=%s ORDER BY create_time DESC LIMIT %s",
+                (int(uid), since_dt, int(limit)))
+            rows = cur.fetchall()
+    finally:
+        c.close()
+    return [{"id": r[0], "title": r[1],
+             "create_time": r[2].strftime("%Y-%m-%d %H:%M:%S") if r[2] else None} for r in rows]
 
 
 # ───────────────────────── ④ KG 只读查表 ─────────────────────────
