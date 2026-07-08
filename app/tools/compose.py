@@ -46,18 +46,26 @@ def _standard_scores(types, total):
 
 def register(mcp, client: RuoyiClient) -> None:
     @mcp.tool()
-    async def compose_paper(outline: list[OutlineItem], title: str = "") -> dict:
+    async def compose_paper(outline: list[OutlineItem], title: str = "",
+                            lesson_id: str = "", slot_seq: int = 0) -> dict:
         """按大纲从真题库确定性组卷并真落库 biz_paper，归属当前登录 teacher。
 
         参数:
           outline: [{subjectId, subjectName?, questionType, difficult, count}, ...]
                    subjectId 取自 list_kg_tree 的叶子 id；编排层负责选点，本工具不二次解析意图。
           title:   卷名（可选，默认"MCP组卷"）。
+          lesson_id / slot_seq: 🔴 PRD-B-101 备课卷位绑定（可选，二者必须**同现**）——给了则本卷落
+                   【备课卷】(paper_kind='2') 并绑到该课次卷位；只给一个 → 本地报错不发请求；
+                   都省 = 普通卷（一切照旧）。🔴 备课卷私有，绝不 set-public。
         返回:
           {ok, paper_id, item_count, paper, notes}；底座不在/无匹配题 → {ok:false, reason}（不假成功）。
         """
         if not client.has_session():
             return {"ok": False, "reason": "需先 login"}
+        has_lesson, has_slot = bool(lesson_id), bool(slot_seq and int(slot_seq) > 0)
+        if has_lesson != has_slot:
+            return {"ok": False, "reason": "lesson_id 与 slot_seq 必须同现（备课卷位绑定）："
+                    "只给一个无效。要么都给（绑卷位=备课卷 paper_kind=2），要么都省（普通卷）。"}
         teacher_id: Optional[int] = client.user_id
         if teacher_id is None:
             return {"ok": False, "reason": "会话无 teacher_id，请重新 login"}
@@ -72,6 +80,9 @@ def register(mcp, client: RuoyiClient) -> None:
             "save": True,          # 🔴 真落库
             "teacherId": teacher_id,  # 🔴 归属当前登录 teacher
         }
+        if has_lesson:            # 🔴 PRD-B-101：透传绑卷位（BE 自动 paper_kind='2' + 绑 slot）
+            body["lessonId"] = str(lesson_id)
+            body["slotSeq"] = int(slot_seq)
         try:
             resp = await client.auto_generate(body)
         except RuoyiError as e:
@@ -111,7 +122,8 @@ def register(mcp, client: RuoyiClient) -> None:
         }
 
     @mcp.tool()
-    async def create_paper(name: str, question_ids: list[int], paper_category_id: str = "") -> dict:
+    async def create_paper(name: str, question_ids: list[int], paper_category_id: str = "",
+                           lesson_id: str = "", slot_seq: int = 0) -> dict:
         """按指定题目 id 列表（顺序即试卷内题号顺序）组装成一套**试卷**入卷库，归属当前登录 teacher。
 
         用于整卷录入：题目已 ingest_question 入库后，把它们按原卷题号顺序串成 biz_paper（建 section + biz_paper_question 关联）。
@@ -119,15 +131,25 @@ def register(mcp, client: RuoyiClient) -> None:
           name: 试卷名（如原卷标题），1-200 字符。
           question_ids: 题目 id 列表，**顺序 = 试卷内题号顺序**，至少 1 题。
           paper_category_id: 试卷分类 id（可选，卷库目录树；空=根级）。
+          lesson_id / slot_seq: 🔴 PRD-B-101 备课卷位绑定（可选，二者必须**同现**）——给了则本卷落
+                   【备课卷】(paper_kind='2') 并绑到该课次卷位；只给一个 → 本地报错不发请求；
+                   都省 = 普通卷。🔴 备课卷私有，绝不 set-public。
         返回: {ok, paper_id, ...}；异常 → {ok:false, reason}。
         """
         if not client.has_session():
             return {"ok": False, "reason": "需先 login"}
         if not name or not question_ids:
             return {"ok": False, "reason": "name 与 question_ids 必填"}
+        has_lesson, has_slot = bool(lesson_id), bool(slot_seq and int(slot_seq) > 0)
+        if has_lesson != has_slot:
+            return {"ok": False, "reason": "lesson_id 与 slot_seq 必须同现（备课卷位绑定）："
+                    "只给一个无效。要么都给（绑卷位=备课卷 paper_kind=2），要么都省（普通卷）。"}
         body = {"name": name, "questionIds": [int(q) for q in question_ids]}
         if paper_category_id:
             body["paperCategoryId"] = paper_category_id
+        if has_lesson:            # 🔴 PRD-B-101：透传绑卷位（BE 自动 paper_kind='2' + 绑 slot，事务一致）
+            body["lessonId"] = str(lesson_id)
+            body["slotSeq"] = int(slot_seq)
         try:
             resp = await client.teacher_post("/teacher/exam/paper/create", body)
         except RuoyiError as e:
@@ -176,3 +198,53 @@ def register(mcp, client: RuoyiClient) -> None:
         except RuoyiError as e:
             return {"ok": False, "reason": f"更新失败: {e}"}
         return {"ok": True, "paper_id": paper_id, "total": sum(scores), "per_question": scores}
+
+    @mcp.tool()
+    async def bind_paper_slot(lesson_id: str, slot_seq: int = 0, action: str = "bind",
+                              paper_id: str = "", ready: bool = True) -> dict:
+        """🔴 PRD-B-101 备课卷位绑定管理（绑既有卷 / 解绑 / 标记已备好）→ 备课线。返回 {ok, paper_slots, prep_state}。
+
+        备课主路 = 组卷时直接带 lesson_id+slot_seq 建卷即自动绑（create_paper/compose_paper）；
+        本工具是**事后管理**：把已有卷挂到卷位（D7 兜底）、解绑、或手动标记整课次已备好。
+        🔴 备课卷私有，本工具不含任何公开化能力（绝不 set-public）。
+        参数:
+          lesson_id : 课次 id（字符串雪花号）——必填。
+          slot_seq  : 卷位序号（≥1）——action=bind/unbind 必填；action=manual_ready 忽略（课次级）。
+          action    : 动作枚举——
+            'bind'         绑既有卷到卷位（传 paper_id，必须真实存在且归我；BE 自动置该卷 paper_kind='2'）
+            'unbind'      解绑卷位（卷留库不删；🔴 解绑会自动清该课次 manual_ready=false）
+            'manual_ready' 手动标记整课次备课态（传 ready；0 卷位课次 → BE 400）
+          paper_id  : action=bind 时必填（要挂的既有卷 id，字符串雪花号）。
+          ready     : action=manual_ready 时的目标态（True=已备好，默认 True）。
+        返回: {ok, paper_slots:[...], prep_state:'0未备/1备课中/2已备好'}；异常 → {ok:false, error}。
+        """
+        if not client.has_session():
+            return {"ok": False, "error": "需先 login"}
+        if not lesson_id:
+            return {"ok": False, "error": "lesson_id 必填"}
+        lid = str(lesson_id)
+        base = f"/teacher/schedule/plan/lesson/{lid}"
+        try:
+            if action == "bind":
+                if not paper_id:
+                    return {"ok": False, "error": "action='bind' 需传 paper_id（要挂的既有卷 id）"}
+                if not (slot_seq and int(slot_seq) > 0):
+                    return {"ok": False, "error": "action='bind' 需传 slot_seq（≥1）"}
+                resp = await client.teacher_post(
+                    f"{base}/slot/{int(slot_seq)}/bind", {"paperId": str(paper_id)})
+            elif action == "unbind":
+                if not (slot_seq and int(slot_seq) > 0):
+                    return {"ok": False, "error": "action='unbind' 需传 slot_seq（≥1）"}
+                resp = await client.teacher_post(f"{base}/slot/{int(slot_seq)}/unbind", {})
+            elif action == "manual_ready":
+                resp = await client.teacher_post(f"{base}/manual-ready", {"ready": bool(ready)})
+            else:
+                return {"ok": False, "error": f"未知 action: {action}（应为 bind/unbind/manual_ready）"}
+        except RuoyiError as e:
+            return {"ok": False, "error": f"{action} 失败: {e}"}
+        resp = resp or {}
+        return {
+            "ok": True,
+            "paper_slots": resp.get("paperSlots") if isinstance(resp, dict) else None,
+            "prep_state": resp.get("prepState") if isinstance(resp, dict) else None,
+        }

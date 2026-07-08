@@ -52,10 +52,11 @@ def _cleanup() -> None:
 # 本阶段是「视图优化」非安全边界（/teacher/** 仍零 @SaCheckPermission，接口级收窄另立下一轮 PRD）。
 _SHARED = {"login", "list_kg_tree", "resolve_kg", "search_questions", "get_question", "get_role_manual"}
 _GROUPS = {
+    # 🔴 PRD-B-101：build_prep_pack/render_prep_pack 退役（不入 prep 工具面）；新增 bind_paper_slot 卷位管理
     "prep": {"create_teach_target", "list_teach_targets", "upsert_course_plan", "schedule_sessions",
-             "list_schedule", "update_session", "build_prep_pack", "render_prep_pack", "submit_review",
+             "list_schedule", "update_session", "submit_review",
              "get_student_profile", "get_plan_detail", "list_lecture_docs", "get_lecture_content",
-             "compose_paper", "create_paper", "update_paper", "ingest_items", "upload_image"},
+             "compose_paper", "create_paper", "update_paper", "bind_paper_slot", "ingest_items", "upload_image"},
     "ingest": {"format_question", "upload_image", "ingest_question", "ingest_items", "verify_ingest",
                "convert_doc", "convert_pdf", "parse_paper_text", "label_question"},
     "lecture": {"convert_lecture_docx", "save_lecture_frag", "remove_lecture_frag",
