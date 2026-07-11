@@ -154,6 +154,8 @@ def _map_session_item(it: dict) -> dict:
     st = it.get("session_type") or it.get("sessionType")
     if st is not None:
         out["sessionType"] = str(st)
+    if it.get("subject") is not None:
+        out["subject"] = str(it.get("subject"))  # 学科(字典 biz_edu_subject)，空=沿计划/对象兜底
     if it.get("external_title") or it.get("externalTitle"):
         out["externalTitle"] = it.get("external_title") or it.get("externalTitle")
     if it.get("note"):
@@ -282,6 +284,8 @@ async def _upsert_course_plan(client, plan: dict, lessons=None) -> dict:
     if tid is not None:
         body["targetId"] = str(tid)
     _reject_deprecated_seg(plan, "default_seg_template", "default_paper_slots")
+    if plan.get("subject") is not None:
+        body["subject"] = str(plan.get("subject"))  # 学科归位课程安排层：一计划一科
     if plan.get("material_note") is not None:
         body["materialNote"] = plan.get("material_note")
     if plan.get("default_paper_slots") is not None:
@@ -336,7 +340,7 @@ async def _list_schedule(client, start, end, target_id=None) -> dict:
 
 
 async def _update_session(client, session_id, action, date=None, start=None, end=None,
-                         plan_lesson_id=None, note=None) -> dict:
+                         plan_lesson_id=None, subject=None, note=None) -> dict:
     sid = str(session_id)
     base = f"{BASE}/session/{sid}"
     if action == "reschedule":
@@ -345,6 +349,8 @@ async def _update_session(client, session_id, action, date=None, start=None, end
         resp = await client.teacher_put(base, {"planLessonId": str(plan_lesson_id)})
     elif action == "note":
         resp = await client.teacher_put(base, {"note": note})
+    elif action == "subject":
+        resp = await client.teacher_put(base, {"subject": str(subject)})
     elif action == "leave":
         resp = await client.teacher_post(f"{base}/leave", {})
     elif action == "cancel":
@@ -356,7 +362,7 @@ async def _update_session(client, session_id, action, date=None, start=None, end
     elif action == "unlock":
         resp = await client.teacher_post(f"{base}/unlock", {})
     else:
-        return {"ok": False, "error": f"未知 action: {action}（应为 reschedule/leave/cancel/mark_done/lock/unlock/rebind/note）"}
+        return {"ok": False, "error": f"未知 action: {action}（应为 reschedule/leave/cancel/mark_done/lock/unlock/rebind/note/subject）"}
     out = {"ok": True}
     if isinstance(resp, dict):
         if resp.get("deferred") is not None:
