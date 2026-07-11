@@ -1,7 +1,7 @@
 """MCP 工具·备课组（prep 角色）：
-  教学安排与备课闭环 11 工具（create_teach_target/list_teach_targets/upsert_course_plan/
-    schedule_sessions/list_schedule/update_session/build_prep_pack/render_prep_pack/
-    submit_review/get_student_profile/get_plan_detail）
+  教学安排与备课闭环 13 工具（create_teach_target/update_teach_target/archive_target/
+    list_teach_targets/upsert_course_plan/schedule_sessions/list_schedule/update_session/
+    build_prep_pack/render_prep_pack/submit_review/get_student_profile/get_plan_detail）
   组卷 4 工具（compose_paper/create_paper/update_paper/bind_paper_slot）
 
 PRD-O-005 重建：合并旧 app/tools/{schedule,compose}.py；单 client（:9090，A/C 已合并），
@@ -212,6 +212,61 @@ async def _list_teach_targets(client, target_type=None, keyword="", include_arch
         params["keyword"] = keyword
     resp = await client.teacher_get(f"{BASE}/target/page", params)
     return {"ok": True, "items": _rows(resp)}
+
+
+async def _update_teach_target(client, target_id, target_type, name=None, grade_no=None,
+                               grade_year=None, textbook_edition=None, subject=None,
+                               parent_phone=None, color=None, profile=None) -> dict:
+    """改教学对象（学生/班级）：基本维 PUT /target/{id}（只传给定字段）+ 可选整覆写肖像 PUT /target/{id}/profile。
+
+    🔴 BE update 走 updateById（NOT_NULL 策略跳空）——**不传的字段保持原值**，基本维**不动 profile_json**；
+       肖像是独立端点整体覆写，故 profile 非 None 才另发（传 {} 会清空肖像，谨慎）。
+    🔴 target_type 必传：BE 靠它判学生表/班级表（'student'|'class' 或 '0'|'1'）。
+    """
+    tid = str(target_id)
+    tt = _tt_code(target_type)
+    updated: list = []
+    body: dict = {"targetType": tt}
+    if name is not None:
+        body["name"] = name
+    if grade_no is not None:
+        body["gradeNo"] = int(grade_no)
+    if grade_year is not None:
+        body["gradeYear"] = int(grade_year)
+    if textbook_edition is not None:
+        body["textbookEdition"] = str(textbook_edition)
+    if subject is not None:
+        body["subject"] = str(subject)
+    if parent_phone is not None:
+        body["parentPhone"] = parent_phone
+    if color is not None:
+        body["color"] = color
+    if len(body) > 1:  # 除 targetType 外还有实字段才发基本维 PUT
+        await client.teacher_put(f"{BASE}/target/{tid}", body)
+        updated.append("basic")
+    if profile is not None:
+        # 肖像整体覆写走独立端点；targetType 作 query 参（拼进 path，httpx 透传）
+        await client.teacher_put(f"{BASE}/target/{tid}/profile?targetType={tt}", profile)
+        updated.append("profile")
+    if not updated:
+        return {"ok": False, "error": "无可改字段：基本维(name/grade_no/grade_year/textbook_edition/subject/"
+                                      "parent_phone/color)与 profile 至少给一个"}
+    return {"ok": True, "id": tid, "updated": updated}
+
+
+async def _archive_target(client, target_id, archived=True) -> dict:
+    """归档/取消归档教学对象（学生/班级的「软删除」）→ POST /target/{id}/archive|unarchive。
+
+    🔴 归档≠硬删：对象退出排课选择器、保留历史；BUG-015 归档**联动取消该对象未来未上的场次**（返回取消数）。
+       取消归档不恢复场次（要复课走重新排课）。BE archiveAuto 先查两表自动判学生/班级，故无需传 target_type。
+    """
+    tid = str(target_id)
+    if archived:
+        resp = await client.teacher_post(f"{BASE}/target/{tid}/archive", {})
+        cancelled = resp.get("cancelled") if isinstance(resp, dict) else None
+        return {"ok": True, "id": tid, "archived": True, "cancelled_sessions": cancelled}
+    await client.teacher_post(f"{BASE}/target/{tid}/unarchive", {})
+    return {"ok": True, "id": tid, "archived": False}
 
 
 async def _upsert_course_plan(client, plan: dict, lessons=None) -> dict:
@@ -615,6 +670,54 @@ def register(mcp, client: RuoyiClient) -> None:
         """
         try:
             return await _list_teach_targets(client, target_type, keyword, include_archived)
+        except RuoyiError as e:
+            return {"ok": False, "error": str(e)}
+
+    @mcp.tool(tags={"prep"})
+    async def update_teach_target(
+        target_id: str, target_type: str, name: str = None, grade_no: int = None,
+        grade_year: int = None, textbook_edition: str = None, subject: str = None,
+        parent_phone: str = None, color: str = None, profile: dict = None,
+    ) -> dict:
+        """改教学对象档案（学生/班级信息修改）→ :9090。返回 {ok, id, updated:['basic'/'profile']}。
+
+        create_teach_target 只能建、建完改不了——本工具补上「改」：改名/年级/教材/学科/家长手机/色，或整体覆写肖像。
+        🔴 只改传入的字段：不传的保持原值（BE updateById NOT_NULL 跳空）；基本维**不动肖像**，肖像走独立整覆写。
+        🔴 target_type 必传（BE 靠它选学生表/班级表）；改肖像务必先 get_student_profile 取全量再整体回传（传 {} 会清空）。
+        参数:
+          target_id        : 对象 id（字符串雪花号）——必填
+          target_type      : 'student' | 'class'——必填（决定改哪张表）
+          name             : 新对象名（不传=不改）
+          grade_no         : 年级 1-12（字典 biz_edu_grade）
+          grade_year       : grade_no 生效学年起始年（如 2026）
+          textbook_edition : 教材版本码（biz_edu_edition：1浙教/2人教/3北师大/4苏教，兼容中文标签）
+          subject          : 学科码（biz_edu_subject：1数学/2科学/3语文/4英语，兼容中文标签）
+          parent_phone     : 家长手机号（仅学生）
+          color            : 日历着色
+          profile          : 肖像 dict（**整体覆写**，非增量！结构见 create_teach_target 的 profile 说明）——
+                             改肖像典型流程 = get_student_profile 读回 → 本地改 → 整体传回
+        """
+        try:
+            return await _update_teach_target(client, target_id, target_type, name, grade_no,
+                                              grade_year, textbook_edition, subject, parent_phone,
+                                              color, profile)
+        except RuoyiError as e:
+            return {"ok": False, "error": str(e)}
+
+    @mcp.tool(tags={"prep"})
+    async def archive_target(target_id: str, archived: bool = True) -> dict:
+        """归档 / 取消归档教学对象（学生·班级的「软删除」）→ :9090。
+        返回 {ok, id, archived, cancelled_sessions?}。
+
+        🔴 归档 = 本系统的「删学生」：对象移出排课选择器、历史保留（非硬删）。
+           归档会**联动取消该对象未来未上的场次**，cancelled_sessions 返回联动取消的场次数。
+           取消归档（archived=False）只解归档标记、**不恢复已取消场次**（复课需重新排课）。
+        参数:
+          target_id : 对象 id（字符串雪花号）
+          archived  : True=归档（软删，默认）| False=取消归档（复用）
+        """
+        try:
+            return await _archive_target(client, target_id, archived)
         except RuoyiError as e:
             return {"ok": False, "error": str(e)}
 
