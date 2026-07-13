@@ -15,8 +15,9 @@ PY = str(ROOT / ".venv" / "Scripts" / "python.exe")
 
 # 旧 .mcp.json 形态：command=python -m teacher_mcp.server + env TEACHER_MCP_ROLE
 # O-005 溯源增强：新增共享工具 my_recent_uploads，各角色视图 +1
-# PRD-B-101（B 线移植）：新增 bind_paper_slot，仅 prep 视图 +1 → 27
-EXPECT = {"prep": 27, "ingest": 17, "lecture": 16, "variant": 15}
+# MCP 收口（2026-07-13）基线：prep=32（+update/archive_teach_target 学科归位轮 +special3 收口）；
+# 新增 shelf 角色=14（shared6+health+my_recent_uploads+shelf6）；all=55
+EXPECT = {"all": 55, "prep": 32, "ingest": 17, "lecture": 16, "variant": 15, "shelf": 14}
 
 
 @pytest.mark.asyncio

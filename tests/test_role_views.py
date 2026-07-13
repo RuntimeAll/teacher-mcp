@@ -13,8 +13,13 @@ SHARED = {"login", "list_kg_tree", "resolve_kg", "search_questions", "get_questi
 HEALTH = {"health_check"}
 # PRD-O-005 溯源增强：新增共享工具（进所有角色视图，各 +1）
 NEW_SHARED = {"my_recent_uploads"}
-# PRD-B-101（B 线移植）：新增备课组工具（仅进 prep 视图，prep/all 各 +1；build/render_prep_pack 退役但留 stub 不减数）
-NEW_PREP = {"bind_paper_slot"}
+# PRD-B-101（B 线移植）+ 学科归位轮：新增备课组工具（仅进 prep 视图；build/render_prep_pack 退役但留 stub 不减数）
+NEW_PREP = {"bind_paper_slot", "update_teach_target", "archive_target"}
+# MCP 收口（2026-07-13）：C 线 PRD-003 专项三工具（tags={"prep"}，进 prep/all 视图）
+SPECIAL3 = {"compose_special", "export_special", "bind_special_to_lesson"}
+# MCP 收口（2026-07-13）：A 线 PRD-002 书架六工具（tags={"shelf"}，进 shelf/all 视图）
+SHELF6 = {"create_book", "list_books", "get_book_structure",
+          "add_book_node", "add_book_item", "override_item"}
 
 # 非共享·录入组（旧 ingest 组新增 9）
 INGEST_ONLY = {"format_question", "upload_image", "ingest_question", "ingest_items", "verify_ingest",
@@ -46,11 +51,10 @@ def test_baseline_is_34():
 
 @pytest.mark.asyncio
 async def test_role_all():
-    # 批3 起 all 纳入举一反三 7 工具；O-005 溯源增强 +my_recent_uploads；PRD-B-101 +bind_paper_slot：
-    # 34 ∪ health ∪ variant7 ∪ new_shared ∪ new_prep = 44
+    # 34 ∪ health ∪ variant7 ∪ new_shared ∪ new_prep3 ∪ special3 ∪ shelf6 = 55（MCP 收口后基线）
     names = await _names("all")
     assert ALL_34 <= names  # G1：⊇ 旧 34
-    assert names == ALL_34 | HEALTH | VARIANT_ONLY | NEW_SHARED | NEW_PREP  # 44
+    assert names == ALL_34 | HEALTH | VARIANT_ONLY | NEW_SHARED | NEW_PREP | SPECIAL3 | SHELF6  # 55
 
 
 @pytest.mark.asyncio
@@ -65,8 +69,14 @@ async def test_role_lecture():
 
 @pytest.mark.asyncio
 async def test_role_prep():
-    # PRD-B-101 +bind_paper_slot：27 = 旧25 +my_recent_uploads +bind_paper_slot
-    assert await _names("prep") == SHARED | PREP_ONLY | HEALTH | NEW_SHARED | NEW_PREP  # 27
+    # 32 = shared6 ∪ prep18 ∪ health ∪ new_shared1 ∪ new_prep3 ∪ special3
+    assert await _names("prep") == SHARED | PREP_ONLY | HEALTH | NEW_SHARED | NEW_PREP | SPECIAL3  # 32
+
+
+@pytest.mark.asyncio
+async def test_role_shelf():
+    # shelf 视图（MCP 收口新增角色）= shared6 ∪ health ∪ new_shared1 ∪ shelf6 = 14
+    assert await _names("shelf") == SHARED | HEALTH | NEW_SHARED | SHELF6  # 14
 
 
 @pytest.mark.asyncio
