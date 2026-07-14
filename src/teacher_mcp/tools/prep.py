@@ -355,6 +355,8 @@ async def _update_session(client, session_id, action, date=None, start=None, end
         resp = await client.teacher_post(f"{base}/leave", {})
     elif action == "cancel":
         resp = await client.teacher_post(f"{base}/cancel", {})
+    elif action == "delete":
+        resp = await client.teacher_delete(base)
     elif action == "mark_done":
         resp = await client.teacher_post(f"{base}/mark-done", {})
     elif action == "lock":
@@ -362,7 +364,7 @@ async def _update_session(client, session_id, action, date=None, start=None, end
     elif action == "unlock":
         resp = await client.teacher_post(f"{base}/unlock", {})
     else:
-        return {"ok": False, "error": f"未知 action: {action}（应为 reschedule/leave/cancel/mark_done/lock/unlock/rebind/note/subject）"}
+        return {"ok": False, "error": f"未知 action: {action}（应为 reschedule/leave/cancel/delete/mark_done/lock/unlock/rebind/note/subject）"}
     out = {"ok": True}
     if isinstance(resp, dict):
         if resp.get("deferred") is not None:
@@ -810,7 +812,8 @@ def register(mcp, client: RuoyiClient) -> None:
             'reschedule' 改期（传 date/start/end；🔴 改期=只改时间不改状态、不触发顺延）
             'leave'      请假 → 🔴 触发顺延：该对象该计划、日期在其后的「已排」场次，绑定课次整体前移补位；
                          lesson_locked='1' 的场次保持原课次被跳过；末位课次悬空 → overflow 提示需补排
-            'cancel'     取消 → 同样触发顺延（口径同 leave）
+            'cancel'     取消 → 软取消：置 status='3'，行留库（同样触发顺延，口径同 leave）
+            'delete'     🔴 移除课程 → 物理删除整行、不可恢复（区别于 cancel 软取消）；仅本人场次可删
             'mark_done'  标记已上（session_status→已上）
             'lock'       锁定本场绑定的课次内容（顺延时被跳过、不改绑）
             'unlock'     解锁

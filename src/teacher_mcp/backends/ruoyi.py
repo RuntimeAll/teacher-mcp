@@ -174,6 +174,10 @@ class RuoyiClient:
         """调 /teacher/** 接口（GET，卡片墙/月历/详情等），解 envelope。需先 login。"""
         return await self._teacher_call("GET", path, params=params or {})
 
+    async def teacher_delete(self, path: str) -> Any:
+        """调 /teacher/** 接口（DELETE，硬删场次等），解 envelope。需先 login。"""
+        return await self._teacher_call("DELETE", path)
+
     async def lazy_tree(self, body: Optional[dict] = None) -> Any:
         """拉知识点树（组卷白名单源）。POST /teacher/question/lazyTree。"""
         return await self.teacher_post("/teacher/question/lazyTree", body or {})
