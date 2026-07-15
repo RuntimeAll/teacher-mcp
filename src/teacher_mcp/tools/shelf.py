@@ -136,6 +136,47 @@ def register(mcp, client: RuoyiClient) -> None:
             return {"ok": False, "reason": f"加内容项失败: {e}"}
         return {"ok": True, "item_id": str(resp.get("id")) if isinstance(resp, dict) else None}
 
+    # ───────────────── 课次 ↔ 书章节材料位 ─────────────────
+    @mcp.tool(tags={"prep"})
+    async def bind_book_node_to_lesson(lesson_id: str, node_id: str = "", action: str = "bind") -> dict:
+        """把书籍章节（书架书目录节点）绑到课次材料位，或解绑，或查本课已绑书章节。
+
+        备课态口径（2026-07-15 扩展）：「有专项**或有书章节**=已备好」——绑上任一书章节，
+        课次即显已备好（与 bind_special_to_lesson 同为材料位，两者并集推导）。
+
+        🔴 只 UPDATE biz_course_plan_lesson.book_node_ids 单列——绝不整行 upsert（历史事故：
+           整行重写把 paper_slots 已绑 paper_id 抹掉）。BE 端 partial updateById 只写 book_node_ids。
+
+        参数:
+          lesson_id: 课次 id（字符串）。
+          node_id:   书章节节点 id（biz_shelf_node.id，字符串；action=materials 时忽略）。
+          action:    'bind'（默认）/ 'unbind' / 'materials'（查本课已绑书章节概要）。
+        返回:
+          bind/unbind → {ok, lesson_id, book_node_ids:[...]}；
+          materials   → {ok, lesson_id, book_node_ids:[...],
+                         materials:[{nodeId,nodeTitle,bookId,bookTitle,questionCount}]}。
+        """
+        if not client.has_session():
+            return {"ok": False, "reason": "需先 login"}
+        act = (action or "bind").strip().lower()
+        try:
+            if act == "materials":
+                r = await client.teacher_get(f"{BASE}/lesson/{lesson_id}/book-materials")
+                r = r or {}
+                return {"ok": True, "lesson_id": str(lesson_id),
+                        "book_node_ids": [str(x) for x in (r.get("bookNodeIds") or [])],
+                        "materials": r.get("materials") or []}
+            if act not in ("bind", "unbind"):
+                return {"ok": False, "reason": f"未知 action: {action}（bind/unbind/materials）"}
+            if not node_id:
+                return {"ok": False, "reason": f"action={act} 需 node_id"}
+            r = await client.teacher_post(f"{BASE}/lesson/{lesson_id}/{act}-node", {"nodeId": str(node_id)})
+            r = r or {}
+            return {"ok": True, "lesson_id": str(lesson_id),
+                    "book_node_ids": [str(x) for x in (r.get("bookNodeIds") or [])]}
+        except RuoyiError as e:
+            return {"ok": False, "reason": f"{act} 失败: {e}"}
+
     @mcp.tool(tags={"shelf"})
     async def override_item(item_id: str, override: OverridePayload) -> dict:
         """书内改一道题的题面（D3 override 副本）：只影响本书，题库原子题**不动**。

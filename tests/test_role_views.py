@@ -17,6 +17,8 @@ NEW_SHARED = {"my_recent_uploads"}
 NEW_PREP = {"bind_paper_slot", "update_teach_target", "archive_target"}
 # MCP 收口（2026-07-13）：C 线 PRD-003 专项三工具（tags={"prep"}，进 prep/all 视图）
 SPECIAL3 = {"compose_special", "export_special", "bind_special_to_lesson"}
+# 课时绑书章节材料位（2026-07-15，tags={"prep"}，进 prep/all 视图）
+BOOKBIND = {"bind_book_node_to_lesson"}
 # MCP 收口（2026-07-13）：A 线 PRD-002 书架六工具（tags={"shelf"}，进 shelf/all 视图）
 SHELF6 = {"create_book", "list_books", "get_book_structure",
           "add_book_node", "add_book_item", "override_item"}
@@ -51,10 +53,10 @@ def test_baseline_is_34():
 
 @pytest.mark.asyncio
 async def test_role_all():
-    # 34 ∪ health ∪ variant7 ∪ new_shared ∪ new_prep3 ∪ special3 ∪ shelf6 = 55（MCP 收口后基线）
+    # 34 ∪ health ∪ variant7 ∪ new_shared ∪ new_prep3 ∪ special3 ∪ shelf6 ∪ bookbind1 = 56
     names = await _names("all")
     assert ALL_34 <= names  # G1：⊇ 旧 34
-    assert names == ALL_34 | HEALTH | VARIANT_ONLY | NEW_SHARED | NEW_PREP | SPECIAL3 | SHELF6  # 55
+    assert names == ALL_34 | HEALTH | VARIANT_ONLY | NEW_SHARED | NEW_PREP | SPECIAL3 | SHELF6 | BOOKBIND  # 56
 
 
 @pytest.mark.asyncio
@@ -69,8 +71,8 @@ async def test_role_lecture():
 
 @pytest.mark.asyncio
 async def test_role_prep():
-    # 32 = shared6 ∪ prep18 ∪ health ∪ new_shared1 ∪ new_prep3 ∪ special3
-    assert await _names("prep") == SHARED | PREP_ONLY | HEALTH | NEW_SHARED | NEW_PREP | SPECIAL3  # 32
+    # 33 = shared6 ∪ prep18 ∪ health ∪ new_shared1 ∪ new_prep3 ∪ special3 ∪ bookbind1
+    assert await _names("prep") == SHARED | PREP_ONLY | HEALTH | NEW_SHARED | NEW_PREP | SPECIAL3 | BOOKBIND  # 33
 
 
 @pytest.mark.asyncio
