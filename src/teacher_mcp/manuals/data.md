@@ -121,6 +121,28 @@
 
 ---
 
+# 📚 书架整书录入（shelf 书系：把一本书 1:1 保真录进书架）
+
+**与题库录入的关系**：题先经 `ingest_items` 进题库拿 qid，书架只存**引用 + 呈现覆盖**（biz_shelf_book/node/item 三表）；书可删不伤题。目标 = 书的原貌（结构不乱、版式保真、可导出打印、可课时绑定），区别于把书拆成维度的题库蒸馏。
+
+## 工具面（小规模手工 / 修补用）
+| 工具 | 作用 |
+|---|---|
+| `create_book(title, book_type, subject_id?, grade?, edition?)` | 新建空书。book_type: lecture讲义 / workbook练习册 / special专项 |
+| `list_books` / `get_book_structure(book_id)` | 我的书列表（nodeCount/questionCount 统计）/ 整树一次拉全（目录+items） |
+| `add_book_node(book_id, name, node_type, parent_id?, seq?, kp_id?)` | 加目录节点（node_type 自由值：chapter/lecture/unit/kp/sec…）。🔴 节点名卷面可见，禁内部词（层/★/素材/薄弱），只写干净知识点名 |
+| `add_book_item(node_id, kind, question_id?/explain_title+explain_text)` | 节点挂内容项：kind=question 题引用（question_id 🔴 字符串）/ explain 讲解块（书自持，不引用 KG 讲义层） |
+| `override_item(item_id, override)` | 书内覆盖题面呈现（不动题库原题）。角色元数据也走它：`{role:'example'|'practice', roleLabel:'典型例题', roleSeq:N}`——🔴 【典型例题N】类标记**只进元数据不进题面** |
+| `bind_book_node_to_lesson(lesson_id, node_id, action)` | 书章节挂备课课次材料位（bind/unbind） |
+
+## 🔴 整书批量（千题级）铁律
+1. **别逐题走 MCP 工具**（会话扛不住）→ 走脚本管线，SOP 正本 = ai-bkb skill **「书架整书录入」**（主链十步+硬闸）+ `调度中心-录书样板/小学数学管线/README.md`（全部实战坑），此处不复述。
+2. shelf 节点/item **每次全新建不去重**（只有题按 stem_hash 幂等）——重录先 `DELETE /teacher/shelf/book/{id}`。
+3. 录入用 admin，验收过闸后才转 owner；例题↔练习血缘 `mother_source='教材配套'`（与举一反三变式血缘隔离）。
+4. 导出打印 = BE `POST /teacher/shelf/book/{id}/export {withAnswers}`。
+
+---
+
 # 🎭 讲义录入角色说明书（录入角色的姊妹角色）
 
 **你的职责**：不管讲义从哪来、什么版式，把它录成**挂 KG 节点的讲义片段**（`biz_kg_lecture_frag`），维护者在 `/lecture-hub` 验收。与题目录入同一范式：**智能活（读文档、把讲解映射到知识点、判例题归属）你做；确定性活（忠实转换、切段、图占位、落库、去重）交给工具。**

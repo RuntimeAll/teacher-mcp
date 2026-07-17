@@ -10,7 +10,7 @@
 
 ---
 
-## 角色 / 工具地图（43 工具，按组一行一句「何时用」）
+## 角色 / 工具地图（56 工具，按组一行一句「何时用」）
 
 **共享组（全角色可见，7 + health）**
 | 工具 | 何时用 |
@@ -54,6 +54,18 @@
 | `submit_review(session_id, item_results)` | 课后回收逐题对错→家长反馈+肖像增量 |
 | `get_student_profile` / `get_plan_detail` | 读对象画像/易错库 / 读计划课次蓝本（paperSlots 卷位=圈题依据） |
 | ~~`build_prep_pack` / `render_prep_pack`~~ | 🔴 PRD-B-101 已退役（备课=按卷位组卷；PDF 走平台前端导出，MCP 不再出 PDF），调用返退役指引 |
+
+**书架整书组（shelf，保真书：目录树 + 题引用 + 讲解块）**
+| 工具 | 何时用 |
+|---|---|
+| `create_book(title, book_type, subject_id?, grade?, edition?)` | 新建空书（lecture讲义型/workbook练习册型/special专项） |
+| `list_books` / `get_book_structure(book_id)` | 查我的书列表（N 节·M 题统计）/ 拉整树（目录+items，override 优先渲染） |
+| `add_book_node(book_id, name, node_type, parent_id?, seq?, kp_id?)` | 加目录节点；🔴 节点名卷面可见，禁内部词（层/★/素材/薄弱） |
+| `add_book_item(node_id, kind, question_id?/explain_*)` | 节点挂内容项：question 题引用 / explain 讲解块；🔴 id 全字符串 |
+| `override_item(item_id, override)` | 书内改题面呈现（override_json，不动题库原题）；含 role/roleLabel/roleSeq 角色元数据 |
+| `bind_book_node_to_lesson(lesson_id, node_id, action)` | 书章节绑备课课次（材料位 book_node_ids；unbind 解绑） |
+
+🔴 **整书批量录入（千题级）别逐题走 MCP 工具**——走脚本管线，SOP 正本 = ai-bkb skill「书架整书录入」+ `调度中心-录书样板/小学数学管线/README.md`。工具面适合：手工建小书、修补单节点/单 item、备课绑定。导出打印走 BE `POST /teacher/shelf/book/{id}/export {withAnswers}`（或 FE 书架页导出按钮），MCP 暂无导出工具。
 
 **举一反三组（variant，toolkit 图，写变式题）**
 | 工具 | 何时用 |
