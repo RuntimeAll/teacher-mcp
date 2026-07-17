@@ -53,17 +53,19 @@ def register(mcp, client: RuoyiClient) -> None:
     # ═════════════ 2. generate_calc_paper：一键出卷 ═════════════
     @mcp.tool(tags={"prep"})
     async def generate_calc_paper(groups: list[CalcGroup], title: str = "口算训练",
-                                  seed: str = "", with_group_label: bool = True) -> dict:
-        """一键生成计算题卷（确定性程序生成非 LLM）→ 题目卷 + 教师答案卷双 PDF。
+                                  seed: str = "", with_group_label: bool = True,
+                                  with_answer: bool = False) -> dict:
+        """一键生成计算题卷（确定性程序生成非 LLM）→ 题目卷 PDF（口算主场景不出答案卷）。
 
         按 groups 逐组生成（每组一个类型一个多栏区块），约束内置：进退位可控、除法整除/
-        有余数分型、分数自动约分/假分数化带分数、组内去重；题目卷带「姓名/用时/做对」栏。
+        有余数分型、分数自动约分/假分数化带分数、全卷跨组去重；题目卷带「姓名/用时/做对」栏。
         参数:
           groups: [{type, count, label?}]，type 从 list_calc_types 查（严禁编造）。
           title:  卷名（卷面可见，如"口算训练③（10分钟）"）。
           seed:   随机种子（同参数同 seed 复现同一份卷；空=随机）。
           with_group_label: False 时不印组标题（整卷混排风格）。
-        返回: {ok, question_url, answer_url, total, seed}；未登录/未知类型 → {ok:false, reason}。
+          with_answer: True 才附带教师答案卷（🔴 口算卷默认不出，高年级分数/方程需核对时才开）。
+        返回: {ok, question_url, answer_url?, total, seed}；未登录/未知类型 → {ok:false, reason}。
         """
         if not client.has_session():
             return {"ok": False, "reason": "需先 login"}
@@ -72,6 +74,7 @@ def register(mcp, client: RuoyiClient) -> None:
         body = {
             "title": title,
             "withGroupLabel": with_group_label,
+            "papers": ["question", "answer"] if with_answer else ["question"],
             "groups": [
                 {"type": g.type, "count": g.count, **({"label": g.label} if g.label else {})}
                 for g in groups
