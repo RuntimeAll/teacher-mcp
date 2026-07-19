@@ -22,11 +22,11 @@ BASE = "/teacher/oralcalc"
 
 
 class CalcGroup(BaseModel):
-    """一组题：type=类型码（list_calc_types 查），count=题数，label=组标题（缺省用类型名）。"""
+    """一组题：type=类型码（list_calc_types 查），count=题数，label=分组标记（卷面只印「一、二」序号）。"""
 
     type: str = Field(description="类型码（如 add20c/sub20b/multable/fracdiff，严禁编造，list_calc_types 查全表）")
     count: int = Field(default=12, description="该组题数（1-200，全卷总数 ≤200）")
-    label: str = Field(default="", description="卷面组标题覆盖（缺省=类型名；🔴 卷面可见，只写干净说法）")
+    label: str = Field(default="", description="分组标记（🔴 卷面规范 2026-07-19：内容名不上卷面，只印「一、二」序号标识；此字段仅作分组开关/内部记录）")
 
 
 def register(mcp, client: RuoyiClient) -> None:
@@ -63,7 +63,8 @@ def register(mcp, client: RuoyiClient) -> None:
           groups: [{type, count, label?}]，type 从 list_calc_types 查（严禁编造）。
           title:  卷名（卷面可见，如"口算训练③（10分钟）"）。
           seed:   随机种子（同参数同 seed 复现同一份卷；空=随机）。
-          with_group_label: False 时不印组标题（整卷混排风格）。
+          with_group_label: False 时不印组标（整卷混排风格）。🔴 组标卷面只印「一、二」
+            序号标识、绝不印练习内容名（学生自明，规范 2026-07-19）。
           with_answer: True 才附带教师答案卷（🔴 口算卷默认不出，高年级分数/方程需核对时才开）。
         返回: {ok, question_url, answer_url?, total, seed}；未登录/未知类型 → {ok:false, reason}。
         """
