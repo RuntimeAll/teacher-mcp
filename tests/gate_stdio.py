@@ -18,7 +18,9 @@ PY = str(ROOT / ".venv" / "Scripts" / "python.exe")
 # MCP 收口（2026-07-13）基线：prep=32（+update/archive_teach_target 学科归位轮 +special3 收口）；
 # 新增 shelf 角色=14（shared6+health+my_recent_uploads+shelf6）；all=56
 # 2026-07-15：+bind_book_node_to_lesson（tags={"prep"}，课次绑书章节材料位）→ all 55→56、prep 32→33
-EXPECT = {"all": 56, "prep": 33, "ingest": 17, "lecture": 16, "variant": 15, "shelf": 14}
+# 2026-07-19：+计算题出题器 list_calc_types/generate_calc_paper（tags={"prep"}）→ all +2、prep +2
+# 2026-07-20（PRD-007）：+login_as（tags={"shared"}，免密切身份）→ 所有角色视图各 +1
+EXPECT = {"all": 59, "prep": 36, "ingest": 18, "lecture": 17, "variant": 16, "shelf": 15}
 
 
 @pytest.mark.asyncio

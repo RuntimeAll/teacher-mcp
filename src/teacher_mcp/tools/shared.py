@@ -225,6 +225,30 @@ def register(mcp, client: RuoyiClient, default_role: str = "data") -> None:
         return {"ok": True, "teacher_id": info["user_id"], "username": info["username"]}
 
     @mcp.tool(tags={"shared"})
+    async def login_as(openid: str) -> dict:
+        """飞书机器人免密切身份（PRD-007）：凭服务密钥用 open_id 换该 teacher 的 token，替换本会话身份。
+
+        用途：bot 后端按飞书消息发送者的 open_id 逐消息切身份，让写操作（录题/组卷等）归属各自 teacher。
+        鉴权：服务密钥走 env BOT_SECRET（只在机器人后端持有、不入 git）；调用方不需密码。
+        401 自动重签：切身份后，后续工具遇 token 失效会按当前 open_id 自动重调 botLogin 重签（不走密码重登）。
+        参数:
+          openid: 飞书 open_id（如 ou_xxx）。
+        返回:
+          成功 → {ok:true, user_id, openid}。
+          失败 → {ok:false, hint}：openid 未绑定 teacher → hint 含「未绑定」（bot 按此路由拒绝话术）；
+                 BOT_SECRET 未配置 / 密钥错 / 账号停用等各有对应提示。
+        """
+        if not openid or not str(openid).strip():
+            return {"ok": False, "hint": "openid 为空：请传飞书消息发送者的 open_id"}
+        if not settings.bot_secret:
+            return {"ok": False, "hint": "BOT_SECRET 未配置：请在机器人后端 .env 配置服务密钥 BOT_SECRET（不入 git）"}
+        try:
+            info = await client.login_as(str(openid).strip())
+        except RuoyiError as e:
+            return {"ok": False, "hint": str(e)}
+        return {"ok": True, "user_id": info["user_id"], "openid": info["openid"]}
+
+    @mcp.tool(tags={"shared"})
     async def list_kg_tree() -> dict:
         """查平台知识点树（组卷的知识点白名单源）。返回顶层节点 + children 嵌套。
 

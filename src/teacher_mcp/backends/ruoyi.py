@@ -32,6 +32,7 @@ class RuoyiClient:
         self._user_id: Optional[int] = None
         self._username: Optional[str] = None
         self._password: Optional[str] = None  # 🔴 仅内存，供 401 自动重登
+        self._openid: Optional[str] = None  # 🔴 PRD-007 免密身份：非空则 401 走 botLogin 重签而非密码重登
         self._client = httpx.AsyncClient(
             base_url=base_url or settings.ruoyi_base_url, timeout=60.0, trust_env=False
         )
@@ -52,6 +53,11 @@ class RuoyiClient:
     @property
     def username(self) -> Optional[str]:
         return self._username
+
+    @property
+    def current_openid(self) -> Optional[str]:
+        """当前免密身份的飞书 open_id（PRD-007）。None = 非免密态（普通用户名密码登录 / 未登录）。"""
+        return self._openid
 
     def has_session(self) -> bool:
         return bool(self._token)
@@ -83,6 +89,7 @@ class RuoyiClient:
         self._token = token
         self._username = username
         self._password = password  # 🔴 存凭据供 401 自动重登
+        self._openid = None  # 🔴 普通登录 = 离开免密态，清 openid（否则 401 会错走 botLogin 重签）
         self._user_id = await self._fetch_user_id()
         return {"user_id": self._user_id, "username": self._username}
 
@@ -110,8 +117,59 @@ class RuoyiClient:
         except Exception:
             return uid  # type: ignore[return-value]
 
+    # ───────────────────────── PRD-007 免密切身份 ─────────────────────────
+    async def login_as(self, openid: str) -> dict:
+        """飞书机器人免密签发：凭服务密钥 X-Bot-Secret 调 /auth/botLogin，用 openid 换该 teacher 的 token。
+
+        成功 → 替换 _token/_user_id、记录 _openid（供 401 重签）；免密身份不留用户名密码。
+        /auth/botLogin 不走 envelope，返回 RuoYi 原样 {code, msg, data:{access_token,user_id}}。
+        🔴 openid 未绑定 → BE 返 code!=200 且 msg 含「未绑定」，此处原样带进 RuoyiError.msg（供上层路由拒绝话术）。
+        """
+        if not openid:
+            raise RuoyiError("login_as 需 openid（飞书消息发送者 open_id）")
+        if not settings.bot_secret:
+            raise RuoyiError("BOT_SECRET 未配置：请在机器人后端 .env 配服务密钥 BOT_SECRET（不入 git）")
+        body: dict = {"openid": openid}
+        if settings.ruoyi_client_id:
+            body["clientId"] = settings.ruoyi_client_id
+        resp = await self._client.post(
+            "/auth/botLogin",
+            json=body,
+            headers={"X-Bot-Secret": settings.bot_secret, "clientid": settings.ruoyi_client_id},
+        )
+        try:
+            data = resp.json()
+        except Exception:
+            raise RuoyiError(f"botLogin 响应非 JSON: status={resp.status_code} body={resp.text[:200]}")
+        if data.get("code") != 200:
+            raise RuoyiError(f"botLogin 失败 code={data.get('code')} msg={data.get('msg')}")
+        d = data.get("data") if isinstance(data.get("data"), dict) else {}
+        token = d.get("access_token")
+        if not token:
+            raise RuoyiError(f"botLogin 返回无 access_token: {str(data)[:200]}")
+        self._token = token
+        self._openid = openid
+        self._username = None  # 免密身份：不留用户名密码，401 一律走 openid 重签
+        self._password = None
+        uid = d.get("user_id")
+        try:
+            self._user_id = int(uid) if uid is not None else None
+        except (TypeError, ValueError):
+            self._user_id = uid  # type: ignore[assignment]
+        return {"user_id": self._user_id, "openid": openid}
+
+    async def _resign(self) -> bool:
+        """401 自动恢复调度：免密态(_openid 非空)→ 重调 botLogin 重签；否则回落用户名密码重登。均失败 → False。"""
+        if self._openid:
+            try:
+                await self.login_as(self._openid)
+                return True
+            except RuoyiError:
+                return False
+        return await self._relogin()
+
     async def _relogin(self) -> bool:
-        """用存下的凭据重登一次（401 自动恢复）。无存凭据 → False；重登异常 → False（由调用方抛原始 401）。"""
+        """用存下的凭据重登一次（401 自动恢复兜底）。无存凭据 → False；重登异常 → False（由调用方抛原始 401）。"""
         if not self._username or not self._password:
             return False
         try:
@@ -139,7 +197,8 @@ class RuoyiClient:
         """调 /teacher/** 接口通用底座，解 envelope（code==1 取 response）。需先 login。
 
         POST/PUT 带 json=body；GET 带 params（query）。envelope 口径三线（POST/GET/PUT）统一。
-        🔴 401 → 有存凭据则自动重登一次再重放（_retry=False 防死循环）；仍失败才抛。
+        🔴 401 → 自动重签一次再重放（_retry=False 防死循环）：免密态用 openid 重调 botLogin，
+           否则用存下的用户名密码重登；仍失败才抛。
         """
         if not self._token:
             raise RuoyiError("未登录会话：请先调 login 工具")
@@ -150,9 +209,10 @@ class RuoyiClient:
             kwargs["json"] = body or {}
         resp = await self._client.request(method.upper(), path, **kwargs)
         if resp.status_code == 401:
-            if _retry and await self._relogin():
+            # 🔴 免密态(_openid 非空)优先按 openid 重调 botLogin 重签；否则回落用户名密码重登（_resign 内分派）
+            if _retry and await self._resign():
                 return await self._teacher_call(method, path, body=body, params=params, _retry=False)
-            raise RuoyiError(f"{path} 401：会话失效且自动重登未成功，请重新 login")
+            raise RuoyiError(f"{path} 401：会话失效且自动重登未成功，请重新 login / login_as")
         try:
             data = resp.json()
         except Exception:

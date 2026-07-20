@@ -22,6 +22,10 @@ BOOKBIND = {"bind_book_node_to_lesson"}
 # MCP 收口（2026-07-13）：A 线 PRD-002 书架六工具（tags={"shelf"}，进 shelf/all 视图）
 SHELF6 = {"create_book", "list_books", "get_book_structure",
           "add_book_node", "add_book_item", "override_item"}
+# 计算题出题器（2026-07-19，tags={"prep"}，进 prep/all 视图）
+ORALCALC = {"list_calc_types", "generate_calc_paper"}
+# PRD-007 飞书机器人免密切身份（2026-07-20，tags={"shared"}，进所有角色视图，各 +1）
+PRD007_SHARED = {"login_as"}
 
 # 非共享·录入组（旧 ingest 组新增 9）
 INGEST_ONLY = {"format_question", "upload_image", "ingest_question", "ingest_items", "verify_ingest",
@@ -53,44 +57,46 @@ def test_baseline_is_34():
 
 @pytest.mark.asyncio
 async def test_role_all():
-    # 34 ∪ health ∪ variant7 ∪ new_shared ∪ new_prep3 ∪ special3 ∪ shelf6 ∪ bookbind1 = 56
+    # 34 ∪ health ∪ variant7 ∪ new_shared ∪ new_prep3 ∪ special3 ∪ shelf6 ∪ bookbind1 ∪ oralcalc2 ∪ login_as1 = 59
     names = await _names("all")
     assert ALL_34 <= names  # G1：⊇ 旧 34
-    assert names == ALL_34 | HEALTH | VARIANT_ONLY | NEW_SHARED | NEW_PREP | SPECIAL3 | SHELF6 | BOOKBIND  # 56
+    assert names == (ALL_34 | HEALTH | VARIANT_ONLY | NEW_SHARED | NEW_PREP | SPECIAL3
+                     | SHELF6 | BOOKBIND | ORALCALC | PRD007_SHARED)  # 59
 
 
 @pytest.mark.asyncio
 async def test_role_ingest():
-    assert await _names("ingest") == SHARED | INGEST_ONLY | HEALTH | NEW_SHARED  # 17 = 旧16 +1
+    assert await _names("ingest") == SHARED | INGEST_ONLY | HEALTH | NEW_SHARED | PRD007_SHARED  # 18
 
 
 @pytest.mark.asyncio
 async def test_role_lecture():
-    assert await _names("lecture") == SHARED | LECTURE_ONLY | HEALTH | NEW_SHARED  # 16 = 旧15 +1
+    assert await _names("lecture") == SHARED | LECTURE_ONLY | HEALTH | NEW_SHARED | PRD007_SHARED  # 17
 
 
 @pytest.mark.asyncio
 async def test_role_prep():
-    # 33 = shared6 ∪ prep18 ∪ health ∪ new_shared1 ∪ new_prep3 ∪ special3 ∪ bookbind1
-    assert await _names("prep") == SHARED | PREP_ONLY | HEALTH | NEW_SHARED | NEW_PREP | SPECIAL3 | BOOKBIND  # 33
+    # 36 = shared6 ∪ prep18 ∪ health ∪ new_shared1 ∪ new_prep3 ∪ special3 ∪ bookbind1 ∪ oralcalc2 ∪ login_as1
+    assert await _names("prep") == (SHARED | PREP_ONLY | HEALTH | NEW_SHARED | NEW_PREP
+                                    | SPECIAL3 | BOOKBIND | ORALCALC | PRD007_SHARED)  # 36
 
 
 @pytest.mark.asyncio
 async def test_role_shelf():
-    # shelf 视图（MCP 收口新增角色）= shared6 ∪ health ∪ new_shared1 ∪ shelf6 = 14
-    assert await _names("shelf") == SHARED | HEALTH | NEW_SHARED | SHELF6  # 14
+    # shelf 视图（MCP 收口新增角色）= shared6 ∪ health ∪ new_shared1 ∪ shelf6 ∪ login_as1 = 15
+    assert await _names("shelf") == SHARED | HEALTH | NEW_SHARED | SHELF6 | PRD007_SHARED  # 15
 
 
 @pytest.mark.asyncio
 async def test_role_data():
-    # data == ingest ∪ lecture ∪ {health_check} ∪ new_shared
-    assert await _names("data") == SHARED | INGEST_ONLY | LECTURE_ONLY | HEALTH | NEW_SHARED  # 22 = 旧21 +1
+    # data == ingest ∪ lecture ∪ {health_check} ∪ new_shared ∪ login_as
+    assert await _names("data") == SHARED | INGEST_ONLY | LECTURE_ONLY | HEALTH | NEW_SHARED | PRD007_SHARED  # 23
 
 
 @pytest.mark.asyncio
 async def test_role_variant():
-    # variant 视图 = shared6 ∪ health ∪ 7 举一反三 ∪ new_shared = 15（旧14 +1）
-    assert await _names("variant") == SHARED | HEALTH | VARIANT_ONLY | NEW_SHARED  # 15
+    # variant 视图 = shared6 ∪ health ∪ 7 举一反三 ∪ new_shared ∪ login_as = 16
+    assert await _names("variant") == SHARED | HEALTH | VARIANT_ONLY | NEW_SHARED | PRD007_SHARED  # 16
 
 
 @pytest.mark.asyncio

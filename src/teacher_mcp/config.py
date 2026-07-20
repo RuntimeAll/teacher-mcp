@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     ruoyi_client_id: str = "e5cd7e4891bf95d1d19206ce24a7b32e"
     ruoyi_tenant_id: str = "000000"
 
+    # PRD-007 飞书机器人免密切身份：/auth/botLogin 的服务密钥（X-Bot-Secret）。
+    # 🔴 只落 env、只在机器人后端持有，绝不入 git；未配置 → login_as 直接软拒绝提示。
+    bot_secret: str = ""
+
     # toolkit（LangGraph 举一反三，FastAPI 非 RuoYi，:9093）——health_check 探针用
     toolkit_base_url: str = "http://localhost:9093"
 
