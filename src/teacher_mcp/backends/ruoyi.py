@@ -129,6 +129,11 @@ class RuoyiClient:
             raise RuoyiError("login_as 需 openid（飞书消息发送者 open_id）")
         if not settings.bot_secret:
             raise RuoyiError("BOT_SECRET 未配置：请在机器人后端 .env 配服务密钥 BOT_SECRET（不入 git）")
+        # 🔴 不变式下沉（verifier B4）：一旦发起切换，旧身份即作废——任何失败路径都落在
+        # 「无身份」态（后续工具因未登录失败），绝不残留上一个人的 token 被误用。
+        self._token = None
+        self._user_id = None
+        self._openid = None
         body: dict = {"openid": openid}
         if settings.ruoyi_client_id:
             body["clientId"] = settings.ruoyi_client_id
