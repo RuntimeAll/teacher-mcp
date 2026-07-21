@@ -60,6 +60,23 @@ class RuoyiClient:
         return self._openid
 
     def has_session(self) -> bool:
+        """已持 token → True。🔴 PRD-007 后端锁身份：bound_openid 非空时也算「有会话」——
+        首次调用会经 ensure_session 自动 login_as(bound_openid) 建会话，故读侧工具的 has_session 前置闸不误拦。"""
+        return bool(self._token) or bool(settings.bound_openid)
+
+    async def ensure_session(self) -> bool:
+        """确保当前持有可用登录态。已登录 → True。
+        🔴 PRD-007 CLI 驱动版·后端锁身份：未登录且 settings.bound_openid 非空 → 自动 login_as(bound_openid)
+           走 botLogin 建会话（绝不用用户名密码；身份由后端环境变量锁死，模型无从干预）。
+           login_as 失败（openid 未绑定 / 密钥错等）→ 保持未登录态并返回 False（上层按未登录/未绑定拒绝）。
+        🔴 bound_openid 为空且无 token → 直接 False，不做任何事（保持原「需先 login」行为完全不变）。"""
+        if self._token:
+            return True
+        if settings.bound_openid:
+            try:
+                await self.login_as(settings.bound_openid)
+            except RuoyiError:
+                return False
         return bool(self._token)
 
     # ───────────────────────── 登录 + 取身份 ─────────────────────────
@@ -205,6 +222,10 @@ class RuoyiClient:
         🔴 401 → 自动重签一次再重放（_retry=False 防死循环）：免密态用 openid 重调 botLogin，
            否则用存下的用户名密码重登；仍失败才抛。
         """
+        if not self._token:
+            # 🔴 PRD-007 后端锁身份：bound_openid 非空 → 首次需登录态时自动 login_as(bound_openid) 建会话
+            #    （走 botLogin，不用用户名密码）；bound_openid 为空则 ensure_session 是 no-op，行为不变。
+            await self.ensure_session()
         if not self._token:
             raise RuoyiError("未登录会话：请先调 login 工具")
         kwargs: dict = {"headers": self._headers()}

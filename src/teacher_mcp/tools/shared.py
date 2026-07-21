@@ -189,7 +189,14 @@ async def _get_question(client, ids) -> dict:
 
 
 # ───────────────────────── 注册 ─────────────────────────
-def register(mcp, client: RuoyiClient, default_role: str = "data") -> None:
+def register(mcp, client: RuoyiClient, default_role: str = "data",
+             hide_auth_tools: bool = False) -> None:
+    """注册共享工具组。
+
+    🔴 hide_auth_tools（PRD-007 后端锁身份）：True → 不注册 login / login_as 两工具，使模型无法自行切身份
+       （防提示注入：用户消息里写「用 admin 身份」也无从执行，身份由后端 BOUND_OPENID 环境变量锁死）。
+       build_server 据 settings.bound_openid 非空传 True。False（默认）→ 两工具照常注册，现有行为不变。
+    """
     # ── 说明书 resource（三角色各一，全角色可见）──
     @mcp.resource("teacher://manual/data")
     def _manual_data() -> str:
@@ -207,7 +214,6 @@ def register(mcp, client: RuoyiClient, default_role: str = "data") -> None:
     def _manual_all() -> str:
         return _read_manual("all") or "（总手册缺失）"
 
-    @mcp.tool(tags={"shared"})
     async def login(username: str = "", password: str = "") -> dict:
         """以真实 teacher 账号登录平台，拿双头 token 注入本会话身份（后续所有工具隐式带该身份、落 RuoYi 权限审计）。
 
@@ -224,7 +230,6 @@ def register(mcp, client: RuoyiClient, default_role: str = "data") -> None:
             return {"ok": False, "reason": str(e)}
         return {"ok": True, "teacher_id": info["user_id"], "username": info["username"]}
 
-    @mcp.tool(tags={"shared"})
     async def login_as(openid: str) -> dict:
         """飞书机器人免密切身份（PRD-007）：凭服务密钥用 open_id 换该 teacher 的 token，替换本会话身份。
 
@@ -247,6 +252,12 @@ def register(mcp, client: RuoyiClient, default_role: str = "data") -> None:
         except RuoyiError as e:
             return {"ok": False, "hint": str(e)}
         return {"ok": True, "user_id": info["user_id"], "openid": info["openid"]}
+
+    # 🔴 PRD-007 后端锁身份：仅当未隐藏时才把 login / login_as 暴露为工具。
+    #    bound_openid 非空 → hide_auth_tools=True → 两工具不注册，模型无法自行切身份（防提示注入）。
+    if not hide_auth_tools:
+        mcp.tool(tags={"shared"})(login)
+        mcp.tool(tags={"shared"})(login_as)
 
     @mcp.tool(tags={"shared"})
     async def list_kg_tree() -> dict:
@@ -338,6 +349,8 @@ def register(mcp, client: RuoyiClient, default_role: str = "data") -> None:
         """
         if not client.has_session():
             return {"ok": False, "error": "需先 login"}
+        # 🔴 后端锁身份下 has_session 靠 bound_openid 放行，真正的 token/user_id 在此惰性建立（DB 找回路径要 user_id）
+        await client.ensure_session()
         # ── 快速找回路径：batch_id / since 任一给出 → DB 只读检索（绕 stem LIKE，不漏变式题）──
         if batch_id or since:
             since_dt = None
@@ -379,6 +392,8 @@ def register(mcp, client: RuoyiClient, default_role: str = "data") -> None:
         """
         if not client.has_session():
             return {"ok": False, "error": "需先 login"}
+        # 🔴 后端锁身份下 has_session 靠 bound_openid 放行，真正的 token/user_id 在此惰性建立
+        await client.ensure_session()
         uid = client.user_id
         if uid is None:
             return {"ok": False, "error": "会话无 user_id，请重新 login"}

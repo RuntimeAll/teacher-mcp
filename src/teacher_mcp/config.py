@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     # 🔴 只落 env、只在机器人后端持有，绝不入 git；未配置 → login_as 直接软拒绝提示。
     bot_secret: str = ""
 
+    # PRD-007 CLI 驱动版·后端锁身份（防提示注入）：飞书 bot 每次调 headless claude CLI 前
+    # 设 env BOUND_OPENID=<已核验的发送者 open_id>，CLI 透传给本 MCP 子进程。
+    # 🔴 非空 → ①RuoyiClient 首次需登录态时自动 login_as(bound_openid) 走 botLogin（绝不用用户名密码）；
+    #         ②login/login_as 两工具对模型隐藏，模型无法自行切身份（用户消息里写「用 admin 身份」也无效）。
+    # 🔴 为空 → 行为完全不变（login/login_as 照常注册，SDK/交互路径不受影响）。
+    bound_openid: str = ""
+
     # toolkit（LangGraph 举一反三，FastAPI 非 RuoYi，:9093）——health_check 探针用
     toolkit_base_url: str = "http://localhost:9093"
 

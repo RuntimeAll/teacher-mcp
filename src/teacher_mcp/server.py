@@ -75,7 +75,11 @@ def build_server(role: str = "all") -> FastMCP:
             pass
 
     # ── 工具注册（加能力 = 在此 register 一行）──
-    tool_shared.register(mcp, client, manual_role)   # login/list_kg_tree/resolve_kg/search/get/manual + health_check
+    # 🔴 PRD-007 后端锁身份：BOUND_OPENID 非空（bot CLI 驱动版）→ 隐藏 login/login_as，
+    #    身份由后端环境变量锁死，模型无法自行切身份（防提示注入）。空 → 现有行为完全不变。
+    from teacher_mcp.config import settings as _settings
+    hide_auth = bool(_settings.bound_openid)
+    tool_shared.register(mcp, client, manual_role, hide_auth_tools=hide_auth)  # login/list_kg_tree/resolve_kg/search/get/manual + health_check
     tool_qbank.register(mcp, client)                 # 录题组（convert/format/ingest/verify/label）
     tool_lecture.register(mcp, client)               # 讲义组（convert_lecture_docx/save/remove/list/get）
     tool_prep.register(mcp, client)                  # 备课组（schedule 11 + compose/create/update_paper）
