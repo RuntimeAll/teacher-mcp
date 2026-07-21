@@ -99,4 +99,15 @@
 | 卷位管理 | `bind_paper_slot`（bind / unbind / manual_ready，🔴 PRD-B-101 新增） |
 | 交付导出 | 平台「我的卷库 · 【备课卷】」前端导出 PDF（🔴 MCP 不再出 PDF） |
 | 课后回收 | `submit_review`（下游，非备课期） |
+| 课后反馈单 | `list_feedback_sheets` · `get_feedback_sheet` · `upsert_feedback_sheet` · `export_feedback_png`（🔴 PRD-009） |
 | ~~装包 / 渲染~~ | ~~`build_prep_pack` · `render_prep_pack`~~（🔴 PRD-B-101 已退役，调用返退役指引） |
+
+## 课后反馈单（PRD-009 · 飞书课后反馈机器人主链）
+
+老师发学生作业照片 → 你多模态 `Read` 看图 → 提炼五列 → 建单 → 导 PNG 回传。链路：
+
+1. **认学生**：`list_teach_targets` 把学生名（乐乐）映射到 `target_id`（严禁编造）。
+2. **看图**：对老师发来的每张本地图路径逐张用 `Read` 工具读，提炼「学了什么 / 掌握到什么程度 / 哪里还不足」。
+3. **建单**：`upsert_feedback_sheet(target_id, title, lesson_date, rows)`；rows=五列 `[{seq,module,content,mastery,weakness}]`。改已有单 → 带 `sheet_id`（先 `list_feedback_sheets` 找回，别新建重复单）。
+4. **导图**：`export_feedback_png(sheet_id)` → 把返回的 `file_marker`（`[[FILE:/tmp/fb_export_*.png]]`）**原样**写进回复，bot 据此把图内联发回。
+5. 🔴 **家长可见**：title / mastery / weakness 一律家长能懂的话，**绝不出现** 层/★/素材/薄弱/挑题；掌握情况用「熟练/基本掌握/待巩固」。

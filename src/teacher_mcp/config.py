@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     # toolkit（LangGraph 举一反三，FastAPI 非 RuoYi，:9093）——health_check 探针用
     toolkit_base_url: str = "http://localhost:9093"
 
+    # PRD-009 课后反馈：export_feedback_png 把家长版 PNG 下载落到本机的目录（bot 读本地文件免鉴权）。
+    # 🔴 /teacher/schedule/artifact 是 @SaCheckLogin，故由持 token 的 MCP 下载写盘，非 bot 裸下载。
+    feedback_out_dir: str = "/tmp"
+
     # 真账号身份：正式由 login 工具传参；以下仅 login 不传参时兜底 + 冒烟用
     ruoyi_username: str = ""
     ruoyi_password: str = ""

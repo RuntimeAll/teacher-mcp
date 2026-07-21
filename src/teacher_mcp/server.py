@@ -19,6 +19,7 @@ from teacher_mcp.backends.ruoyi import RuoyiClient
 from teacher_mcp.backends.toolkit import ToolkitClient
 from teacher_mcp.tools import data_lecture as tool_lecture
 from teacher_mcp.tools import data_qbank as tool_qbank
+from teacher_mcp.tools import feedback as tool_feedback
 from teacher_mcp.tools import oralcalc as tool_oralcalc
 from teacher_mcp.tools import prep as tool_prep
 from teacher_mcp.tools import shared as tool_shared
@@ -83,6 +84,7 @@ def build_server(role: str = "all") -> FastMCP:
     tool_qbank.register(mcp, client)                 # 录题组（convert/format/ingest/verify/label）
     tool_lecture.register(mcp, client)               # 讲义组（convert_lecture_docx/save/remove/list/get）
     tool_prep.register(mcp, client)                  # 备课组（schedule 11 + compose/create/update_paper）
+    tool_feedback.register(mcp, client)              # 课后反馈单组（PRD-009 list/get/upsert/export_png，tags={"prep"}）
     tool_special.register(mcp, client)               # 备课·专项组（compose/export/bind_special，tags={"prep"}）
     tool_oralcalc.register(mcp, client)              # 计算题出题器（list_calc_types/generate_calc_paper，tags={"prep"}）
     tool_shelf.register(mcp, client)                 # 书架组（create_book/node/item/structure/override，tags={"shelf"}）

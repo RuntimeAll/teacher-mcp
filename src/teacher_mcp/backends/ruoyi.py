@@ -264,6 +264,27 @@ class RuoyiClient:
         """调 /teacher/** 接口（DELETE，硬删场次等），解 envelope。需先 login。"""
         return await self._teacher_call("DELETE", path)
 
+    async def teacher_get_bytes(
+        self, path: str, params: Optional[dict] = None, _retry: bool = True
+    ) -> bytes:
+        """调 /teacher/** 的二进制下载端点（如 /teacher/schedule/artifact），返回原始 bytes（不解 envelope）。
+
+        🔴 PRD-009：该端点 @SaCheckLogin，须带 token；bot 无 token，故由本客户端（已持登录 teacher
+           token）下载后落本地，bot 读本地文件。需先 login；401 → 自动重签一次再重放（防死循环）。
+        """
+        if not self._token:
+            await self.ensure_session()
+        if not self._token:
+            raise RuoyiError("未登录会话：请先调 login 工具")
+        resp = await self._client.get(path, params=params or {}, headers=self._headers())
+        if resp.status_code == 401:
+            if _retry and await self._resign():
+                return await self.teacher_get_bytes(path, params=params, _retry=False)
+            raise RuoyiError(f"{path} 401：会话失效且自动重登未成功，请重新 login / login_as")
+        if resp.status_code != 200:
+            raise RuoyiError(f"{path} 二进制下载失败 status={resp.status_code} body={resp.text[:200]}")
+        return resp.content
+
     async def lazy_tree(self, body: Optional[dict] = None) -> Any:
         """拉知识点树（组卷白名单源）。POST /teacher/question/lazyTree。"""
         return await self.teacher_post("/teacher/question/lazyTree", body or {})
