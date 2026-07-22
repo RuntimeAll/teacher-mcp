@@ -2,13 +2,17 @@
 
 🔴 env_file 用绝对路径（基于本文件定位），免受 MCP server 被 stdio client 以任意 cwd 拉起的影响。
 🔴 PRD-O-005 重建：A/C 双线已合并为同一服务（默认 :9090）；单 RuoyiClient，无 Cluster。
+🔴 双实例（2026-07-22）：env TEACHER_MCP_ENV_FILE 可指定替代 env 文件（如 prod 连接配置，
+   真凭据落 workplace 外 password/ 目录不入任何 git）——同一份代码起 localhost/prod 两个 MCP 实例。
 """
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# 仓根 = src/teacher_mcp/config.py 往上三层
-_ENV = Path(__file__).resolve().parent.parent.parent / ".env"
+# 仓根 = src/teacher_mcp/config.py 往上三层；TEACHER_MCP_ENV_FILE 显式指定时优先（双实例支撑）
+_ENV = Path(os.environ.get("TEACHER_MCP_ENV_FILE") or
+            Path(__file__).resolve().parent.parent.parent / ".env")
 
 
 class Settings(BaseSettings):
