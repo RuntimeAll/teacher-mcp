@@ -99,15 +99,21 @@
 | 卷位管理 | `bind_paper_slot`（bind / unbind / manual_ready，🔴 PRD-B-101 新增） |
 | 交付导出 | 平台「我的卷库 · 【备课卷】」前端导出 PDF（🔴 MCP 不再出 PDF） |
 | 课后回收 | `submit_review`（下游，非备课期） |
-| 课后反馈单 | `list_feedback_sheets` · `get_feedback_sheet` · `upsert_feedback_sheet` · `export_feedback_png`（🔴 PRD-009） |
+| 课后反馈单 | `list_feedback_sheets` · `get_feedback_sheet` · `upsert_feedback_sheet` · `export_feedback_batch_png`（批次长图）· `export_feedback_png`（单张）（🔴 PRD-009/010） |
 | ~~装包 / 渲染~~ | ~~`build_prep_pack` · `render_prep_pack`~~（🔴 PRD-B-101 已退役，调用返退役指引） |
 
-## 课后反馈单（PRD-009 · 飞书课后反馈机器人主链）
+## 课后反馈单（PRD-009/010 · 飞书课后反馈机器人主链 · 批次模型）
 
-老师发学生作业照片 → 你多模态 `Read` 看图 → 提炼五列 → 建单 → 导 PNG 回传。链路：
+🔴 **批次模型（用户工作流=批次累积一次性全发）**：一个学生一段课程 = 一个**批次**
+（`batch_key` 如「多多五上暑假数学」，独立概念**不绑课程计划**）；批次内课次 `lesson_seq`
+1,2,3… 依次递增，每上一节课追加一张单；**发家长 = 批次全量长图**（1~N 节拼一张）；
+老师说「新开批次/新学期」才换新 batch_key 从第 1 节重计。
 
-1. **认学生**：`list_teach_targets` 把学生名（乐乐）映射到 `target_id`（严禁编造）。
-2. **看图**：对老师发来的每张本地图路径逐张用 `Read` 工具读，提炼「学了什么 / 掌握到什么程度 / 哪里还不足」。
-3. **建单**：`upsert_feedback_sheet(target_id, title, lesson_date, rows)`；rows=五列 `[{seq,module,content,mastery,weakness}]`。改已有单 → 带 `sheet_id`（先 `list_feedback_sheets` 找回，别新建重复单）。
-4. **导图**：`export_feedback_png(sheet_id)` → 把返回的 `file_marker`（`[[FILE:/tmp/fb_export_*.png]]`）**原样**写进回复，bot 据此把图内联发回。
-5. 🔴 **家长可见**：title / mastery / weakness 一律家长能懂的话，**绝不出现** 层/★/素材/薄弱/挑题；掌握情况用「熟练/基本掌握/待巩固」。
+接力链路（老师发作业照片让你出第 N 节反馈时）：
+
+1. **认学生**：`list_teach_targets` 把学生名映射到 `target_id`（严禁编造）。
+2. **查批次**：`list_feedback_sheets(target_id)` 看该生最新批次到第几节 → 新单 `lesson_seq` = 最大值+1，`batch_key` 沿用；该生没批次则按「学生+学期+科目」起新键。
+3. **看图**：对老师发来的每张本地图路径逐张 `Read`，提炼「学了什么 / 掌握情况 / 不足点」。
+4. **建单**：`upsert_feedback_sheet(target_id, title, rows, batch_key, lesson_seq)`；title 缺省口径「{batch_key}第{N}节课上课内容」。改已有单带 `sheet_id`，别新建重复单。
+5. **导图**：`export_feedback_batch_png(target_id)`（缺省=最新批次，含刚建的一节）→ 把 `file_marker`（`[[FILE:/tmp/fb_batch_*.png]]`）**原样**写进回复，bot 据此把长图内联发回。单独看某一节才用 `export_feedback_png(sheet_id)`。
+6. 🔴 **家长可见**：title / mastery / weakness 一律家长话术，**绝不出现** 层/★/素材/薄弱/挑题；掌握情况用「熟练/基本掌握/待巩固」。

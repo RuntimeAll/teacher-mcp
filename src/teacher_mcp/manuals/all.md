@@ -53,7 +53,7 @@
 | `bind_paper_slot(lesson_id, slot_seq, action)` | 🔴 PRD-B-101 卷位管理（bind 绑既有卷 / unbind 解绑 / manual_ready 标已备好） |
 | `submit_review(session_id, item_results)` | 课后回收逐题对错→家长反馈+肖像增量 |
 | `get_student_profile` / `get_plan_detail` | 读对象画像/易错库 / 读计划课次蓝本（paperSlots 卷位=圈题依据） |
-| `list_feedback_sheets` / `get_feedback_sheet` / `upsert_feedback_sheet` / `export_feedback_png` | 🔴 PRD-009 课后反馈单：看图提炼五列→建单→导家长版 PNG（export 返 file_marker 原样写回，bot 内联发图） |
+| `list_feedback_sheets` / `get_feedback_sheet` / `upsert_feedback_sheet` / `export_feedback_batch_png` / `export_feedback_png` | 🔴 PRD-009/010 课后反馈：批次模型（batch_key+lesson_seq 递增，不绑课程计划）；看图提炼五列→建单→**发家长=批次全量长图**（file_marker 原样写回，bot 内联发图） |
 | ~~`build_prep_pack` / `render_prep_pack`~~ | 🔴 PRD-B-101 已退役（备课=按卷位组卷；PDF 走平台前端导出，MCP 不再出 PDF），调用返退役指引 |
 
 **书架整书组（shelf，保真书：目录树 + 题引用 + 讲解块）**
