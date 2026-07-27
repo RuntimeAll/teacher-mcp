@@ -14,6 +14,7 @@ dependencies = [
     "dwml>=0.2",             # OMML→LaTeX
     "lxml>=5.0",
     "matplotlib>=3.8",       # D8 方案A 渲图旁路：题干 markdown+$LaTeX$ → 试卷版式 PNG（mathtext）
+    "pillow>=10",            # 数字谜竖式图生成器（render_shuzimi_figure 纯 PIL 绘制）
 ]
 
 [dependency-groups]

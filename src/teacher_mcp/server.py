@@ -24,6 +24,7 @@ from teacher_mcp.tools import oralcalc as tool_oralcalc
 from teacher_mcp.tools import prep as tool_prep
 from teacher_mcp.tools import shared as tool_shared
 from teacher_mcp.tools import shelf as tool_shelf
+from teacher_mcp.tools import shuzimi as tool_shuzimi
 from teacher_mcp.tools import special as tool_special
 from teacher_mcp.tools import variant as tool_variant
 
@@ -87,6 +88,7 @@ def build_server(role: str = "all") -> FastMCP:
     tool_feedback.register(mcp, client)              # 课后反馈单组（PRD-009 list/get/upsert/export_png，tags={"prep"}）
     tool_special.register(mcp, client)               # 备课·专项组（compose/export/bind_special，tags={"prep"}）
     tool_oralcalc.register(mcp, client)              # 计算题出题器（list_calc_types/generate_calc_paper，tags={"prep"}）
+    tool_shuzimi.register(mcp, client)               # 数字谜竖式图生成器（render_shuzimi_figure，tags={"data","prep"}）
     tool_shelf.register(mcp, client)                 # 书架组（create_book/node/item/structure/override，tags={"shelf"}）
     tool_variant.register(mcp, client, toolkit)      # 举一反三组（make_variants 等 7，tags={"variant"}）
 
