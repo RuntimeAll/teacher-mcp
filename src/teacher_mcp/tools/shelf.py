@@ -34,7 +34,10 @@ def register(mcp, client: RuoyiClient) -> None:
     @mcp.tool(tags={"shelf"})
     async def create_book(title: str, book_type: str = "workbook",
                           subject_id: str = "", grade: str = "", edition: str = "") -> dict:
-        """新建一本空书（起步）。book_type: lecture讲义型 / workbook练习册型 / special备课挑题专项 / variant_special举一反三专项（五级递进变式成册，SOP-2 立项即建）。
+        """新建一本空书（起步）。book_type 开放注册制（BE 不校验，任意 snake_case slug 可传）：
+        已注册值 = lecture讲义 / workbook练习册 / textbook电子课本 / special备课挑题专项(不进书架列表) /
+        variant_special举一反三专项(SOP-2 立项即建) / daily_punch每日打卡。
+        新资料形态（口算集训、错题重练…）自定新 slug 即可，🔴 但须先到 认知/服务与能力总目录.md「书类型注册表」挂号 + book-ui BOOK_TYPE_LABEL 补中文名，否则前端显示裸 slug。
 
         返回 {ok, book_id(str)}；随后用 add_book_node + add_book_item 建目录树与内容，
         或整树一次建书走 import（B 线录入直出书交接面，本工具面不含 import）。

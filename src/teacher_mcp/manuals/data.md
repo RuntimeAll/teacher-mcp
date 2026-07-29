@@ -128,7 +128,7 @@
 ## 工具面（小规模手工 / 修补用）
 | 工具 | 作用 |
 |---|---|
-| `create_book(title, book_type, subject_id?, grade?, edition?)` | 新建空书。book_type: lecture讲义 / workbook练习册 / special备课挑题专项 / variant_special举一反三专项（五级递进变式成册，立项即建、属性录全：年级+章节KG锚+组建配方进 remark/style_meta） |
+| `create_book(title, book_type, subject_id?, grade?, edition?)` | 新建空书。book_type 开放注册制（BE 不校验）：lecture讲义 / workbook练习册 / textbook课本 / special备课挑题(不进书架列表) / variant_special举一反三专项（立项即建、属性录全：年级+章节KG锚+组建配方进 remark/style_meta） / daily_punch每日打卡；新资料形态自定 snake_case slug，先到 认知/服务与能力总目录.md「书类型注册表」挂号 + FE BOOK_TYPE_LABEL 补中文名 |
 | `list_books` / `get_book_structure(book_id)` | 我的书列表（nodeCount/questionCount 统计）/ 整树一次拉全（目录+items） |
 | `add_book_node(book_id, name, node_type, parent_id?, seq?, kp_id?)` | 加目录节点（node_type 自由值：chapter/lecture/unit/kp/sec…）。🔴 节点名卷面可见，禁内部词（层/★/素材/薄弱），只写干净知识点名 |
 | `add_book_item(node_id, kind, question_id?/explain_title+explain_text)` | 节点挂内容项：kind=question 题引用（question_id 🔴 字符串）/ explain 讲解块（书自持，不引用 KG 讲义层） |
