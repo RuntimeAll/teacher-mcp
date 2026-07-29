@@ -133,7 +133,9 @@ def register(mcp, client: RuoyiClient) -> None:
         """读回「第 N 天」完整内容 → {ok, goals, modules, review}（展示页/生成器回读共用）。
 
         modules 结构与 upsert_punch_day 入参同构：计算模块带 items:[{q,a}]；
-        轮换位为**引用渲染态**（BE 按 qid 组装 blocks，题面来自题库 block_json，不是复制文本）。
+        🔴 返回与 upsert 入参**同构**（round-trip 语义）：轮换位返 {type:'rotating',title,qids}——
+        **不含题面**（改字回读→upsert 直接可用）；要渲染态题面走 BE /teacher/punch/preview
+        （blocks 由 BE 现取 block_json 组装，agent 无需自行拉题）。
         review = {status, issues:[{module,seq,kind,note,resolved}]}。
         🔴 局部改一天内容 = 先 get 拿全量 → 改 → 整天 upsert_punch_day 回灌（覆盖语义）。
         参数: book_id 字符串；day 第几天（1 起）。
