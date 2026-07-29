@@ -19,6 +19,7 @@ from teacher_mcp.backends.ruoyi import RuoyiClient
 from teacher_mcp.backends.toolkit import ToolkitClient
 from teacher_mcp.tools import data_lecture as tool_lecture
 from teacher_mcp.tools import data_qbank as tool_qbank
+from teacher_mcp.tools import qbank_admin as tool_qbank_admin
 from teacher_mcp.tools import feedback as tool_feedback
 from teacher_mcp.tools import oralcalc as tool_oralcalc
 from teacher_mcp.tools import prep as tool_prep
@@ -83,6 +84,7 @@ def build_server(role: str = "all") -> FastMCP:
     hide_auth = bool(_settings.bound_openid)
     tool_shared.register(mcp, client, manual_role, hide_auth_tools=hide_auth)  # login/list_kg_tree/resolve_kg/search/get/manual + health_check
     tool_qbank.register(mcp, client)                 # 录题组（convert/format/ingest/verify/label）
+    tool_qbank_admin.register(mcp, client)           # 题库管理组（delete_questions 安全删散题，tags={"data"}）
     tool_lecture.register(mcp, client)               # 讲义组（convert_lecture_docx/save/remove/list/get）
     tool_prep.register(mcp, client)                  # 备课组（schedule 11 + compose/create/update_paper）
     tool_feedback.register(mcp, client)              # 课后反馈单组（PRD-009 list/get/upsert/export_png，tags={"prep"}）

@@ -250,6 +250,116 @@ def recent_lecture_frags(uid, since_dt, limit=50):
              "create_time": r[2].strftime("%Y-%m-%d %H:%M:%S") if r[2] else None} for r in rows]
 
 
+# ───────────────────────── ⑥ 散题安全删除（v4 散题拍板 2026-07-29：孤题直接删）─────────────────────────
+# 🔴 只能删"散题"：被任何载体/资产引用的题一律拒删（blocked 返回，要删先解绑）。
+# 阻删引用面 = 四载体 + 解题模型母题 + 活血缘母题（variant 不在本批删除集）+ 讲义 doc_json qid。
+
+_DEL_BLOCKERS = [
+    ("biz_paper_question", "question_id", "试卷"),
+    ("biz_exam_paper_item", "question_id", "导入卷"),
+    ("biz_shelf_item", "question_id", "书架书"),
+    ("biz_book_question", "question_id", "教辅书"),
+    ("biz_solution_model", "mother_question_id", "解题模型母题"),
+]
+_DEL_CASCADES = [
+    "biz_question_ai", "biz_question_block", "biz_question_free_tag", "biz_question_image",
+    "biz_question_knowledge", "biz_question_model", "biz_question_note", "biz_question_pattern_rel",
+    "biz_question_pitfall", "biz_question_basket", "biz_question_favorite", "biz_review_issue",
+    "biz_anchor_worklist", "biz_text_content",
+]
+
+
+def delete_questions_safe(question_ids, actor="agent", reason="", dry_run=True, backup_dir=None):
+    """散题安全删除。dry_run=True 只预览（deletable/blocked，不动库）；真删前备份主行+正文 JSON，
+    随删全部附属表行 + variation_trace(variant 侧)，写 biz_label_audit 审计。单次 ≤500。
+    返回 {ok, deletable, blocked{id:原因[]}, deleted, backup_path}。"""
+    import json as _json
+    import re as _re
+    import tempfile
+    from datetime import datetime as _dt
+
+    ids = sorted({int(q) for q in question_ids})
+    if not ids:
+        return {"ok": False, "reason": "question_ids 为空"}
+    if len(ids) > 500:
+        return {"ok": False, "reason": f"单次上限 500，传了 {len(ids)}"}
+    fmt = ",".join(["%s"] * len(ids))
+    blocked = {}
+
+    def _block(qid, why):
+        blocked.setdefault(str(qid), []).append(why)
+
+    c = conn()
+    try:
+        with c.cursor() as cur:
+            # 只删真实存在的题
+            cur.execute(f"SELECT id FROM biz_question WHERE id IN ({fmt})", ids)
+            existing = {r[0] for r in cur.fetchall()}
+            for q in ids:
+                if q not in existing:
+                    _block(q, "题不存在")
+            # 载体/资产引用闸
+            for table, col, label in _DEL_BLOCKERS:
+                cur.execute(f"SELECT DISTINCT {col} FROM {table} WHERE {col} IN ({fmt})", ids)
+                for (q,) in cur.fetchall():
+                    _block(q, label)
+            # 活血缘母题闸：作为母题且其变式不在本批删除集 → 拒删
+            cur.execute(
+                f"SELECT DISTINCT mother_question_id FROM biz_variation_trace"
+                f" WHERE mother_question_id IN ({fmt}) AND variant_question_id NOT IN ({fmt})",
+                ids + ids)
+            for (q,) in cur.fetchall():
+                _block(q, "活血缘母题")
+            # 讲义闸：doc_json 内 qid 引用（讲义量小，全抽）
+            cur.execute("SELECT doc_json FROM biz_kg_doc WHERE doc_json LIKE %s", ('%"qid"%',))
+            lecture_qids = set()
+            for (dj,) in cur.fetchall():
+                for m in _re.finditer(r'"qid"\s*:\s*"?(\d{5,})', dj or ""):
+                    lecture_qids.add(int(m.group(1)))
+            for q in ids:
+                if q in lecture_qids:
+                    _block(q, "讲义引用")
+
+            deletable = [q for q in ids if str(q) not in blocked]
+            if dry_run:
+                return {"ok": True, "dry_run": True, "deletable": [str(q) for q in deletable],
+                        "deletable_count": len(deletable), "blocked": blocked}
+            if not deletable:
+                return {"ok": False, "reason": "全部被阻删", "blocked": blocked}
+
+            dfmt = ",".join(["%s"] * len(deletable))
+            # 备份：主行 + 正文
+            cur.execute(f"SELECT * FROM biz_question WHERE id IN ({dfmt})", deletable)
+            qcols = [d[0] for d in cur.description]
+            qrows = [dict(zip(qcols, r)) for r in cur.fetchall()]
+            cur.execute(f"SELECT * FROM biz_text_content WHERE question_id IN ({dfmt})", deletable)
+            tcols = [d[0] for d in cur.description]
+            trows = [dict(zip(tcols, r)) for r in cur.fetchall()]
+            ts = _dt.now().strftime("%Y%m%d-%H%M%S")
+            bdir = backup_dir or tempfile.gettempdir()
+            bpath = f"{bdir}/deleted_questions_{settings.db_database}_{ts}.json"
+            with open(bpath, "w", encoding="utf-8") as f:
+                _json.dump({"reason": reason, "actor": actor, "db": settings.db_database,
+                            "questions": qrows, "text_contents": trows},
+                           f, ensure_ascii=False, default=str)
+            # 事务删除：附属 → 血缘(variant 侧) → 主表
+            for table in _DEL_CASCADES:
+                cur.execute(f"DELETE FROM {table} WHERE question_id IN ({dfmt})", deletable)
+            cur.execute(f"DELETE FROM biz_variation_trace WHERE variant_question_id IN ({dfmt})", deletable)
+            cur.execute(f"DELETE FROM biz_question WHERE id IN ({dfmt})", deletable)
+            cur.execute(
+                "INSERT INTO biz_label_audit(api,action,target_type,target_id,actor,actor_type,"
+                "payload_brief,result) VALUES('delete_questions','DELETE','question',%s,%s,'agent',%s,'ok')",
+                (str(len(deletable)), (actor or "agent")[:64],
+                 _json.dumps({"reason": reason, "ids": [str(q) for q in deletable[:60]],
+                              "total": len(deletable)}, ensure_ascii=False)[:2000]))
+            c.commit()
+            return {"ok": True, "dry_run": False, "deleted": [str(q) for q in deletable],
+                    "deleted_count": len(deletable), "blocked": blocked, "backup_path": bpath}
+    finally:
+        c.close()
+
+
 # ───────────────────────── ④ KG 只读查表 ─────────────────────────
 
 def _subseq(query, name):
