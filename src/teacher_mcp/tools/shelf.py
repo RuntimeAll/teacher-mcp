@@ -34,7 +34,7 @@ def register(mcp, client: RuoyiClient) -> None:
     @mcp.tool(tags={"shelf"})
     async def create_book(title: str, book_type: str = "workbook",
                           subject_id: str = "", grade: str = "", edition: str = "") -> dict:
-        """新建一本空书（起步）。book_type: lecture讲义型 / workbook练习册型 / special专项。
+        """新建一本空书（起步）。book_type: lecture讲义型 / workbook练习册型 / special备课挑题专项 / variant_special举一反三专项（五级递进变式成册，SOP-2 立项即建）。
 
         返回 {ok, book_id(str)}；随后用 add_book_node + add_book_item 建目录树与内容，
         或整树一次建书走 import（B 线录入直出书交接面，本工具面不含 import）。

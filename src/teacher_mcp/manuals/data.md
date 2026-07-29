@@ -128,7 +128,7 @@
 ## 工具面（小规模手工 / 修补用）
 | 工具 | 作用 |
 |---|---|
-| `create_book(title, book_type, subject_id?, grade?, edition?)` | 新建空书。book_type: lecture讲义 / workbook练习册 / special专项 |
+| `create_book(title, book_type, subject_id?, grade?, edition?)` | 新建空书。book_type: lecture讲义 / workbook练习册 / special备课挑题专项 / variant_special举一反三专项（五级递进变式成册，立项即建、属性录全：年级+章节KG锚+组建配方进 remark/style_meta） |
 | `list_books` / `get_book_structure(book_id)` | 我的书列表（nodeCount/questionCount 统计）/ 整树一次拉全（目录+items） |
 | `add_book_node(book_id, name, node_type, parent_id?, seq?, kp_id?)` | 加目录节点（node_type 自由值：chapter/lecture/unit/kp/sec…）。🔴 节点名卷面可见，禁内部词（层/★/素材/薄弱），只写干净知识点名 |
 | `add_book_item(node_id, kind, question_id?/explain_title+explain_text)` | 节点挂内容项：kind=question 题引用（question_id 🔴 字符串）/ explain 讲解块（书自持，不引用 KG 讲义层） |

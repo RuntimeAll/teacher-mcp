@@ -59,7 +59,7 @@
 **书架整书组（shelf，保真书：目录树 + 题引用 + 讲解块）**
 | 工具 | 何时用 |
 |---|---|
-| `create_book(title, book_type, subject_id?, grade?, edition?)` | 新建空书（lecture讲义型/workbook练习册型/special专项） |
+| `create_book(title, book_type, subject_id?, grade?, edition?)` | 新建空书（lecture讲义型/workbook练习册型/special备课挑题专项/variant_special举一反三专项） |
 | `list_books` / `get_book_structure(book_id)` | 查我的书列表（N 节·M 题统计）/ 拉整树（目录+items，override 优先渲染） |
 | `add_book_node(book_id, name, node_type, parent_id?, seq?, kp_id?)` | 加目录节点；🔴 节点名卷面可见，禁内部词（层/★/素材/薄弱） |
 | `add_book_item(node_id, kind, question_id?/explain_*)` | 节点挂内容项：question 题引用 / explain 讲解块；🔴 id 全字符串 |
