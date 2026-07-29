@@ -20,7 +20,11 @@ PY = str(ROOT / ".venv" / "Scripts" / "python.exe")
 # 2026-07-15：+bind_book_node_to_lesson（tags={"prep"}，课次绑书章节材料位）→ all 55→56、prep 32→33
 # 2026-07-19：+计算题出题器 list_calc_types/generate_calc_paper（tags={"prep"}）→ all +2、prep +2
 # 2026-07-20（PRD-007）：+login_as（tags={"shared"}，免密切身份）→ 所有角色视图各 +1
-EXPECT = {"all": 59, "prep": 36, "ingest": 18, "lecture": 17, "variant": 16, "shelf": 15}
+# 补记漂移（2026-07-30 随 PRD-013 批1 对账，此前几卡上线未同步计数）：
+#   +feedback5（PRD-009，prep）+shuzimi1（data+prep）+delete_questions1（data）
+#   +generate_calc_items1（prep）→ all 59→70、prep 36→43、data 23→25
+# 2026-07-30（PRD-013 批1）：+每日打卡四工具（tags={"prep"}）→ all 70→71、prep 43→47
+EXPECT = {"all": 71, "prep": 47, "data": 25, "ingest": 18, "lecture": 17, "variant": 16, "shelf": 15}
 
 
 @pytest.mark.asyncio

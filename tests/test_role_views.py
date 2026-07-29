@@ -22,10 +22,19 @@ BOOKBIND = {"bind_book_node_to_lesson"}
 # MCP 收口（2026-07-13）：A 线 PRD-002 书架六工具（tags={"shelf"}，进 shelf/all 视图）
 SHELF6 = {"create_book", "list_books", "get_book_structure",
           "add_book_node", "add_book_item", "override_item"}
-# 计算题出题器（2026-07-19，tags={"prep"}，进 prep/all 视图）
-ORALCALC = {"list_calc_types", "generate_calc_paper"}
+# 计算题出题器（2026-07-19 两工具 + 2026-07-29 generate_calc_items，tags={"prep"}，进 prep/all 视图）
+ORALCALC = {"list_calc_types", "generate_calc_paper", "generate_calc_items"}
 # PRD-007 飞书机器人免密切身份（2026-07-20，tags={"shared"}，进所有角色视图，各 +1）
 PRD007_SHARED = {"login_as"}
+# PRD-009 课后反馈单组（2026-07-21，tags={"prep"}，进 prep/all 视图）
+FEEDBACK5 = {"list_feedback_sheets", "get_feedback_sheet", "upsert_feedback_sheet",
+             "export_feedback_png", "export_feedback_batch_png"}
+# 数字谜竖式图生成器（tags={"data","prep"}，进 data/prep/all 视图）
+SHUZIMI = {"render_shuzimi_figure"}
+# 题库管理组（v4 散题清理，tags={"data"}，进 data/all 视图）
+QBANK_ADMIN = {"delete_questions"}
+# PRD-013 每日打卡组（2026-07-30 批1，tags={"prep"}，进 prep/all 视图）
+PUNCH4 = {"upsert_punch_day", "list_punch_days", "get_punch_day", "submit_punch_review"}
 
 # 非共享·录入组（旧 ingest 组新增 9）
 INGEST_ONLY = {"format_question", "upload_image", "ingest_question", "ingest_items", "verify_ingest",
@@ -57,11 +66,13 @@ def test_baseline_is_34():
 
 @pytest.mark.asyncio
 async def test_role_all():
-    # 34 ∪ health ∪ variant7 ∪ new_shared ∪ new_prep3 ∪ special3 ∪ shelf6 ∪ bookbind1 ∪ oralcalc2 ∪ login_as1 = 59
+    # 34 ∪ health ∪ variant7 ∪ new_shared ∪ new_prep3 ∪ special3 ∪ shelf6 ∪ bookbind1
+    # ∪ oralcalc3 ∪ login_as1 ∪ feedback5 ∪ shuzimi1 ∪ qbank_admin1 ∪ punch4 = 71
     names = await _names("all")
     assert ALL_34 <= names  # G1：⊇ 旧 34
     assert names == (ALL_34 | HEALTH | VARIANT_ONLY | NEW_SHARED | NEW_PREP | SPECIAL3
-                     | SHELF6 | BOOKBIND | ORALCALC | PRD007_SHARED)  # 59
+                     | SHELF6 | BOOKBIND | ORALCALC | PRD007_SHARED
+                     | FEEDBACK5 | SHUZIMI | QBANK_ADMIN | PUNCH4)  # 71
 
 
 @pytest.mark.asyncio
@@ -76,9 +87,11 @@ async def test_role_lecture():
 
 @pytest.mark.asyncio
 async def test_role_prep():
-    # 36 = shared6 ∪ prep18 ∪ health ∪ new_shared1 ∪ new_prep3 ∪ special3 ∪ bookbind1 ∪ oralcalc2 ∪ login_as1
+    # 47 = shared6 ∪ prep18 ∪ health ∪ new_shared1 ∪ new_prep3 ∪ special3 ∪ bookbind1
+    #      ∪ oralcalc3 ∪ login_as1 ∪ feedback5 ∪ shuzimi1 ∪ punch4
     assert await _names("prep") == (SHARED | PREP_ONLY | HEALTH | NEW_SHARED | NEW_PREP
-                                    | SPECIAL3 | BOOKBIND | ORALCALC | PRD007_SHARED)  # 36
+                                    | SPECIAL3 | BOOKBIND | ORALCALC | PRD007_SHARED
+                                    | FEEDBACK5 | SHUZIMI | PUNCH4)  # 47
 
 
 @pytest.mark.asyncio
@@ -89,8 +102,9 @@ async def test_role_shelf():
 
 @pytest.mark.asyncio
 async def test_role_data():
-    # data == ingest ∪ lecture ∪ {health_check} ∪ new_shared ∪ login_as
-    assert await _names("data") == SHARED | INGEST_ONLY | LECTURE_ONLY | HEALTH | NEW_SHARED | PRD007_SHARED  # 23
+    # data == ingest ∪ lecture ∪ {health_check} ∪ new_shared ∪ login_as ∪ shuzimi1 ∪ qbank_admin1
+    assert await _names("data") == (SHARED | INGEST_ONLY | LECTURE_ONLY | HEALTH | NEW_SHARED
+                                    | PRD007_SHARED | SHUZIMI | QBANK_ADMIN)  # 25
 
 
 @pytest.mark.asyncio
