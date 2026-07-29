@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from teacher_mcp.backends.ruoyi import RuoyiClient, RuoyiError
+from teacher_mcp.config import settings
 
 # 仓根 = src/teacher_mcp/tools/data_lecture.py 往上四层
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -359,7 +360,7 @@ def register(mcp, client: RuoyiClient) -> None:
         if isinstance(resp, dict):
             resp["unresolved_images"] = sorted(set(unresolved_all))
             # 🔴 写工具返回 book-ui 深链（讲义浏览页）
-            resp["view_url"] = "http://localhost:9091/lecture-hub"
+            resp["view_url"] = f"{settings.fe_base_url}/lecture-hub"
         return resp
 
     @mcp.tool(tags={"data", "lecture"})

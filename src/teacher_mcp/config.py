@@ -38,6 +38,8 @@ class Settings(BaseSettings):
 
     # toolkit（LangGraph 举一反三，FastAPI 非 RuoYi，:9093）——health_check 探针用
     toolkit_base_url: str = "http://localhost:9093"
+    # FE 站点根（view_url 深链用；prod env 配 FE_BASE_URL=http://www.jpjia.cn）
+    fe_base_url: str = "http://localhost:9091"
 
     # PRD-009 课后反馈：export_feedback_png 把家长版 PNG 下载落到本机的目录（bot 读本地文件免鉴权）。
     # 🔴 /teacher/schedule/artifact 是 @SaCheckLogin，故由持 token 的 MCP 下载写盘，非 bot 裸下载。

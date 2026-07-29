@@ -18,6 +18,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from teacher_mcp.backends.ruoyi import RuoyiClient, RuoyiError
+from teacher_mcp.config import settings
 from teacher_mcp.domains import docconv, paperparse
 from teacher_mcp.domains.dicts import ANNO_ERROR, ANNO_SCENE
 from teacher_mcp.domains.paperparse import (
@@ -131,7 +132,7 @@ class IngestItem(BaseModel):
     models: list[ModelRef] = Field(default=[])
     new_models: list[NewModel] = Field(default=[])
     scenario: Optional[str] = Field(default=None, description="纯数学/现实生活/科学跨学科/数学文化")
-    free_tags: list[str] = Field(default=[], description="自由知识标签 → biz_question_ai.tags（科学轻打标即此用法）")
+    free_tags: list[str] = Field(default=[], description="自由知识标签，双落：biz_question_free_tag 关联（检索锚，search/get 回读此表）+ biz_question_ai.tags（科学轻打标）")
     # ── 溯源（可选）──
     source_raw: str = Field(default="")
     exam_year: str = Field(default="")
@@ -289,8 +290,11 @@ def register(mcp, client: RuoyiClient) -> None:
         status: str = "1",
         import_source: str = "",
         import_batch_id: str = "",
+        free_tags: list[str] = [],
     ) -> dict:
         """录一道题入库（事务多表），归属当前登录 teacher。返回 {ok, question_id, created, import_source, batch_id}。
+
+        free_tags: 自由标签 → biz_free_tag 字典 + biz_question_free_tag 关联（三件套之一，检索锚）。
 
         参数（NOT NULL=必填）:
           subject_id  : 科目锚 level1（年级根，如 数学七上 的根 id），NOT NULL
@@ -343,7 +347,9 @@ def register(mcp, client: RuoyiClient) -> None:
         if source_raw:
             body["sourceRaw"] = source_raw
         body["importSource"] = src            # 双管道来源标记（BE IngestServiceImpl 直落）
-        body["importBatchId"] = bid           # 批次号（BE 直落 import_batch_id）
+        body["importBatchId"] = bid           # 批次号（BE 直落 import_batch_id；去重复用时 BE 保留首录批次不覆盖）
+        if free_tags:
+            body["freeTags"] = [str(t).strip() for t in free_tags if str(t).strip()]  # → biz_question_free_tag 三轨
 
         try:
             resp = await client.teacher_post("/teacher/ingest/question", body)
@@ -492,6 +498,7 @@ def register(mcp, client: RuoyiClient) -> None:
                     status="1",
                     import_source=import_source,
                     import_batch_id=batch_id,
+                    free_tags=it.free_tags or [],
                 )
                 if not ing.get("ok"):
                     n_fail += 1
@@ -577,7 +584,7 @@ def register(mcp, client: RuoyiClient) -> None:
             out["paper_id"] = paper_id
         # 🔴 写工具返回 book-ui 深链（题库页）
         if n_ok > 0:
-            out["view_url"] = "http://localhost:9091/question/index"
+            out["view_url"] = f"{settings.fe_base_url}/question/index"
         note = "；".join(x for x in (models_note, paper_note) if x)
         if note:
             out["note"] = note
@@ -608,7 +615,7 @@ def register(mcp, client: RuoyiClient) -> None:
         return f"建卷 paper_id={paper_id} 总分{int(sum(scores))} 时长{suggest_time}min"
 
     @mcp.tool(tags={"data", "ingest"})
-    def verify_ingest(paper_id: int = 0, question_ids: list[int] = []) -> dict:
+    def verify_ingest(paper_id: int = 0, question_ids: list[str] = []) -> dict:
         """🔴 灌库后铁律验证：检查题干开头来源前缀残留（如「（真题·杭州滨江）」「（2025 浙江期末）」）。
 
         ingest_items 已内置预防端自动剥前缀；本工具是验证端——每次灌完卷/批必须跑一次，residue_count 必须=0。

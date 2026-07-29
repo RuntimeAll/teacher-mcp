@@ -426,7 +426,7 @@ def register(mcp, client: RuoyiClient, default_role: str = "data",
             "questions": {"total": len(qrows), "batches": list(batches.values())},
             "papers": papers,
             "lecture_frags": frags,
-            "view_url": "http://localhost:9091/question/index",
+            "view_url": f"{settings.fe_base_url}/question/index",
         }
 
     @mcp.tool(tags={"shared"})
