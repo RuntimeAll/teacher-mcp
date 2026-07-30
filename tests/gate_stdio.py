@@ -24,7 +24,9 @@ PY = str(ROOT / ".venv" / "Scripts" / "python.exe")
 #   +feedback5（PRD-009，prep）+shuzimi1（data+prep）+delete_questions1（data）
 #   +generate_calc_items1（prep）→ all 59→70、prep 36→43、data 23→25
 # 2026-07-30（PRD-013 批1）：+每日打卡四工具（tags={"prep"}）→ all 70→71、prep 43→47
-EXPECT = {"all": 71, "prep": 47, "data": 25, "ingest": 18, "lecture": 17, "variant": 16, "shelf": 15}
+# 2026-07-30（PRD-015 批6）：+export_feedback_plan_png +list_pending_settlements +settle_sessions
+#   （tags={"prep"}）→ all 71→74、prep 47→50；upsert/list_feedback_sheets 只加可选参不计数
+EXPECT = {"all": 74, "prep": 50, "data": 25, "ingest": 18, "lecture": 17, "variant": 16, "shelf": 15}
 
 
 @pytest.mark.asyncio
