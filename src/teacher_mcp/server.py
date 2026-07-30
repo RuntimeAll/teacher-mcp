@@ -24,6 +24,7 @@ from teacher_mcp.tools import feedback as tool_feedback
 from teacher_mcp.tools import oralcalc as tool_oralcalc
 from teacher_mcp.tools import prep as tool_prep
 from teacher_mcp.tools import punch as tool_punch
+from teacher_mcp.tools import settle as tool_settle
 from teacher_mcp.tools import shared as tool_shared
 from teacher_mcp.tools import shelf as tool_shelf
 from teacher_mcp.tools import shuzimi as tool_shuzimi
@@ -89,6 +90,7 @@ def build_server(role: str = "all") -> FastMCP:
     tool_lecture.register(mcp, client)               # 讲义组（convert_lecture_docx/save/remove/list/get）
     tool_prep.register(mcp, client)                  # 备课组（schedule 11 + compose/create/update_paper）
     tool_feedback.register(mcp, client)              # 课后反馈单组（PRD-009 list/get/upsert/export_png，tags={"prep"}）
+    tool_settle.register(mcp, client)                # 课时结算组（PRD-015 list_pending_settlements/settle_sessions，tags={"prep"}）
     tool_special.register(mcp, client)               # 备课·专项组（compose/export/bind_special，tags={"prep"}）
     tool_oralcalc.register(mcp, client)              # 计算题出题器（list_calc_types/generate_calc_paper，tags={"prep"}）
     tool_shuzimi.register(mcp, client)               # 数字谜竖式图生成器（render_shuzimi_figure，tags={"data","prep"}）
