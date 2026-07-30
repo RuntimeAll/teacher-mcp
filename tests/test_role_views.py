@@ -35,6 +35,11 @@ SHUZIMI = {"render_shuzimi_figure"}
 QBANK_ADMIN = {"delete_questions"}
 # PRD-013 每日打卡组（2026-07-30 批1，tags={"prep"}，进 prep/all 视图）
 PUNCH4 = {"upsert_punch_day", "list_punch_days", "get_punch_day", "submit_punch_review"}
+# PRD-015 批6 教务线（2026-07-30，tags={"prep"}，进 prep/all 视图）：
+#   按计划导出反馈图（D13）+ 结算组两工具（D4/D5）。
+#   🔴 向后兼容铁律：upsert_feedback_sheet/list_feedback_sheets 只**加可选参**，不改名不减参，
+#      故本处只 +3 个新工具名，FEEDBACK5 等既有集合一个不动。
+PRD015_3 = {"export_feedback_plan_png", "list_pending_settlements", "settle_sessions"}
 
 # 非共享·录入组（旧 ingest 组新增 9）
 INGEST_ONLY = {"format_question", "upload_image", "ingest_question", "ingest_items", "verify_ingest",
@@ -67,12 +72,12 @@ def test_baseline_is_34():
 @pytest.mark.asyncio
 async def test_role_all():
     # 34 ∪ health ∪ variant7 ∪ new_shared ∪ new_prep3 ∪ special3 ∪ shelf6 ∪ bookbind1
-    # ∪ oralcalc3 ∪ login_as1 ∪ feedback5 ∪ shuzimi1 ∪ qbank_admin1 ∪ punch4 = 71
+    # ∪ oralcalc3 ∪ login_as1 ∪ feedback5 ∪ shuzimi1 ∪ qbank_admin1 ∪ punch4 ∪ prd015_3 = 74
     names = await _names("all")
     assert ALL_34 <= names  # G1：⊇ 旧 34
     assert names == (ALL_34 | HEALTH | VARIANT_ONLY | NEW_SHARED | NEW_PREP | SPECIAL3
                      | SHELF6 | BOOKBIND | ORALCALC | PRD007_SHARED
-                     | FEEDBACK5 | SHUZIMI | QBANK_ADMIN | PUNCH4)  # 71
+                     | FEEDBACK5 | SHUZIMI | QBANK_ADMIN | PUNCH4 | PRD015_3)  # 74
 
 
 @pytest.mark.asyncio
@@ -87,11 +92,11 @@ async def test_role_lecture():
 
 @pytest.mark.asyncio
 async def test_role_prep():
-    # 47 = shared6 ∪ prep18 ∪ health ∪ new_shared1 ∪ new_prep3 ∪ special3 ∪ bookbind1
-    #      ∪ oralcalc3 ∪ login_as1 ∪ feedback5 ∪ shuzimi1 ∪ punch4
+    # 50 = shared6 ∪ prep18 ∪ health ∪ new_shared1 ∪ new_prep3 ∪ special3 ∪ bookbind1
+    #      ∪ oralcalc3 ∪ login_as1 ∪ feedback5 ∪ shuzimi1 ∪ punch4 ∪ prd015_3
     assert await _names("prep") == (SHARED | PREP_ONLY | HEALTH | NEW_SHARED | NEW_PREP
                                     | SPECIAL3 | BOOKBIND | ORALCALC | PRD007_SHARED
-                                    | FEEDBACK5 | SHUZIMI | PUNCH4)  # 47
+                                    | FEEDBACK5 | SHUZIMI | PUNCH4 | PRD015_3)  # 50
 
 
 @pytest.mark.asyncio

@@ -53,7 +53,8 @@
 | `bind_paper_slot(lesson_id, slot_seq, action)` | 🔴 PRD-B-101 卷位管理（bind 绑既有卷 / unbind 解绑 / manual_ready 标已备好） |
 | `submit_review(session_id, item_results)` | 课后回收逐题对错→家长反馈+肖像增量 |
 | `get_student_profile` / `get_plan_detail` | 读对象画像/易错库 / 读计划课次蓝本（paperSlots 卷位=圈题依据） |
-| `list_feedback_sheets` / `get_feedback_sheet` / `upsert_feedback_sheet` / `export_feedback_batch_png` / `export_feedback_png` | 🔴 PRD-009/010 课后反馈：批次模型（batch_key+lesson_seq 递增，不绑课程计划）；看图提炼五列→建单→**发家长=批次全量长图**（file_marker 原样写回，bot 内联发图） |
+| `list_pending_settlements` / `settle_sessions(items, gen_feedback)` | 🔴 PRD-015 课时结算：过点未结清单（**只提醒不自动扣**）→ 老师确认后一键结算 = 扣课时课费（hours 缺省 1，可 0.67/1.5 两位小数）+ 场次已上/已结 + 自动建反馈壳；重复结算幂等 skipped；结错了走 `update_session` 请假/取消自动冲正 |
+| `list_feedback_sheets` / `get_feedback_sheet` / `upsert_feedback_sheet` / `export_feedback_plan_png` / `export_feedback_batch_png` / `export_feedback_png` | 🔴 PRD-015 课后反馈：**绑场次**（session_id 主绑 + 冗余 plan_id），lesson_seq=计划内序号**服务端自动**；结算已建的空壳带 `sheet_id` 补内容别新建；出图=`export_feedback_plan_png(plan_id, mode)`（single 最新一单 / long 全量长图），**出口一律老师本人飞书，无"发送家长"**；batch_key/`export_feedback_batch_png`=PRD-010 遗留只读 |
 | ~~`build_prep_pack` / `render_prep_pack`~~ | 🔴 PRD-B-101 已退役（备课=按卷位组卷；PDF 走平台前端导出，MCP 不再出 PDF），调用返退役指引 |
 
 **书架整书组（shelf，保真书：目录树 + 题引用 + 讲解块）**

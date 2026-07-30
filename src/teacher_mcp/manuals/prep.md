@@ -99,21 +99,52 @@
 | 卷位管理 | `bind_paper_slot`（bind / unbind / manual_ready，🔴 PRD-B-101 新增） |
 | 交付导出 | 平台「我的卷库 · 【备课卷】」前端导出 PDF（🔴 MCP 不再出 PDF） |
 | 课后回收 | `submit_review`（下游，非备课期） |
-| 课后反馈单 | `list_feedback_sheets` · `get_feedback_sheet` · `upsert_feedback_sheet` · `export_feedback_batch_png`（批次长图）· `export_feedback_png`（单张）（🔴 PRD-009/010） |
+| 课时结算 | `list_pending_settlements`（过点未结清单，纯读）· `settle_sessions`（🔴 扣课时课费，老师确认后才调，PRD-015） |
+| 课后反馈单 | `list_feedback_sheets` · `get_feedback_sheet` · `upsert_feedback_sheet` · `export_feedback_plan_png`（🔴 按计划出图，现行）· `export_feedback_batch_png`（老批次长图，遗留）· `export_feedback_png`（指定单张） |
 | ~~装包 / 渲染~~ | ~~`build_prep_pack` · `render_prep_pack`~~（🔴 PRD-B-101 已退役，调用返退役指引） |
 
-## 课后反馈单（PRD-009/010 · 飞书课后反馈机器人主链 · 批次模型）
+## 教务一条线：排课 → 过点 → 结算 → 反馈（PRD-015，2026-07-30 现行）
 
-🔴 **批次模型（用户工作流=批次累积一次性全发）**：一个学生一段课程 = 一个**批次**
-（`batch_key` 如「多多五上暑假数学」，独立概念**不绑课程计划**）；批次内课次 `lesson_seq`
-1,2,3… 依次递增，每上一节课追加一张单；**发家长 = 批次全量长图**（1~N 节拼一张）；
-老师说「新开批次/新学期」才换新 batch_key 从第 1 节重计。
+**一条线只有一个交点 = 场次**（`biz_schedule_session`）：消耗（课时课费）与反馈都挂它。
 
-接力链路（老师发作业照片让你出第 N 节反馈时）：
+```
+排课(schedule_sessions) → 过点 → list_pending_settlements（只提醒不动账）
+   → 老师确认 → settle_sessions（扣课时课费 + 场次已上/已结 + 自动建反馈壳）
+   → upsert_feedback_sheet(sheet_id=壳) 补五列 → export_feedback_plan_png(plan_id) 出图
+   → 发老师本人飞书（老师自己转给家长）
+可逆：已结场次改请假/取消（update_session leave|cancel）→ BE 自动冲正返还 + 空壳删除
+```
+
+### 结算（🔴 动钱动课时，纪律最硬）
+
+1. **只提醒不自动扣（D4）**：`list_pending_settlements()` 纯读——列过点未结场次
+   （`price=null` = 该生该科**没开户**，结算会被 skipped，先让老师去平台开户）。
+2. **必须老师明确确认才扣**：老师说「结算/消课/扣课时」+ 点名场次，才调
+   `settle_sessions(items=[{session_id, hours?, time_note?}])`。看到有待结算就自作主张扣 = 事故。
+3. **实扣课时（D5）**：默认 1 课时/场；上了 2/3 节传 `hours=0.67`，上了一个半传 `1.5`（两位小数）；
+   金额 = 实扣 × 账户单价，**服务端算，别传金额**。`time_note` 记实际上课时间（如「09:05-10:40」）。
+4. **幂等**：重复结算同一场 → 返回 `skipped:[{session_id, reason}]`，其余场照常落账。
+   🔴 看到 skipped **别换 id 重试、别重复调**，把 reason 原样念给老师。
+5. **结错了**：把该场改请假/取消让系统自动冲正，**不要**用调整流水手工抹平。
+
+### 课后反馈单（绑场次 · 序号自动 · 按计划出图）
+
+🔴 **绑定口径（D6/D7）**：反馈**绑场次**（`session_id` 主绑定 + 冗余 `plan_id`），
+`lesson_seq` = **计划内序号**，服务端自动 = 该计划现有反馈数+1；**别自己算序号**。
+`batch_key` 降级为遗留字段（老单只读，新单不再造批次键）。
+
+链路（老师发作业照片让你整理这节反馈时）：
 
 1. **认学生**：`list_teach_targets` 把学生名映射到 `target_id`（严禁编造）。
-2. **查批次**：`list_feedback_sheets(target_id)` 看该生最新批次到第几节 → 新单 `lesson_seq` = 最大值+1，`batch_key` 沿用；该生没批次则按「学生+学期+科目」起新键。
+2. **找壳**：`list_feedback_sheets(plan_id=…)`（或 `target_id=`）——结算已自动建好的**空壳**
+   （rows 空、title 空）就在这儿；**带 `sheet_id` 往壳里补，别新建重复单**。没有壳才新建，
+   新建时传 `session_id`（哪一场课），`plan_id`/`lesson_seq` 交 BE 回填。
 3. **看图**：对老师发来的每张本地图路径逐张 `Read`，提炼「学了什么 / 掌握情况 / 不足点」。
-4. **建单**：`upsert_feedback_sheet(target_id, title, rows, batch_key, lesson_seq)`；title 缺省口径「{batch_key}第{N}节课上课内容」。改已有单带 `sheet_id`，别新建重复单。
-5. **导图**：`export_feedback_batch_png(target_id)`（缺省=最新批次，含刚建的一节）→ 把 `file_marker`（`[[FILE:/tmp/fb_batch_*.png]]`）**原样**写进回复，bot 据此把长图内联发回。单独看某一节才用 `export_feedback_png(sheet_id)`。
-6. 🔴 **家长可见**：title / mastery / weakness 一律家长话术，**绝不出现** 层/★/素材/薄弱/挑题；掌握情况用「熟练/基本掌握/待巩固」。
+4. **补单**：`upsert_feedback_sheet(target_id, rows, sheet_id=…)`；五列 = 序号/所属模块/学习内容/
+   掌握情况/不足点。title 可留空（导出按「序号 · 上课日期」自动拼）。
+5. **导图**：`export_feedback_plan_png(plan_id)` —— `mode='single'`（缺省）= 该计划最新一单单张；
+   `mode='long'` = 全量按序拼长图。把 `file_marker`（`[[FILE:…/fb_plan_*.png]]`）**原样**写进回复，
+   bot 据此内联发回。老批次单（带 batch_key）才用 `export_feedback_batch_png`。
+6. 🔴 **出口（D8）**：一律发**老师本人**飞书，系统**没有"发送家长"功能**，家长侧老师人工转发。
+7. 🔴 **家长可见**：title / mastery / weakness 一律家长话术，**绝不出现** 层/★/素材/薄弱/挑题、
+   也不出现"第几次/第 N 节课"；掌握情况用「熟练/基本掌握/待巩固」。
