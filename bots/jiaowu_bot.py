@@ -35,6 +35,22 @@ IMG_DIR = os.environ.get("BOT_IMG_DIR", "/opt/jiaowu-push/img")
 CONFIRM_TTL = int(os.environ.get("CONFIRM_TTL", "600"))    # 确认态 10 分钟（D2）
 IMG_TTL = int(os.environ.get("IMG_TTL", "1800"))           # 图队列僵尸 30 分钟自清
 
+# 🔴 0 秒回执文案（老 bot PRD-007 停役前的体验遗产，2026-07-31 继承）：
+#    每个意图后面都有 roster + 若干 BE 往返，静默几秒足以让人怀疑"是不是又没回音了"。
+#    先顶一句"在干什么"，再回结果。写反馈类不在此表（act_feedback 自带开场白，避免连发两条）。
+_ACK = {
+    "settle_pending": "收到 ✓ 正在查待结算…",
+    "settle_do":      "收到 ✓ 正在核对场次与单价，算给你看…",
+    "ledger":         "收到 ✓ 正在查台账…",
+    "family_ledger":  "收到 ✓ 正在合两户余额…",
+    "family_recharge": "收到 ✓ 正在算这笔充值…",
+    "family_rebalance": "收到 ✓ 正在算归账对倒…",
+    "account_open":   "收到 ✓ 正在准备开户…",
+    "account_recharge": "收到 ✓ 正在算这笔充值…",
+    "account_adjust": "收到 ✓ 正在准备调整…",
+    "leave":          "收到 ✓ 正在查这节课的状态…",
+}
+
 # ───────────────────────────── 全局态 ─────────────────────────────
 
 _env = X.load_env(ENV_PATH)
@@ -668,6 +684,13 @@ def dispatch(text, rep, forced_student=None, forced_session=None):
     if intent == I.HELP:
         rep.text(I.CAPABILITY_LIST)
         return intent
+
+    # 🔴 0 秒回执（继承老 bot PRD-007 踩出来的体验经验，见其注释）：
+    #    "整件事最要命的体验问题就是发完消息干等好几分钟，不知道 bot 是在干活还是已经挂了"。
+    #    下面每个 act_* 都要先拉花名册再打 BE（少则 1 秒、多则十几秒），静默期必须先顶一句。
+    #    写反馈自己有开场白（act_feedback 里那句"正在整理"），不重复顶。
+    if intent not in (I.FEEDBACK_TEXT, I.FEEDBACK_IMAGE):
+        rep.text(_ACK.get(intent, "收到 ✓ 处理中…"))
 
     roster = be().roster()
     slots = I.extract(intent, text, roster, today())
