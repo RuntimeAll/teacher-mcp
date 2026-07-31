@@ -66,7 +66,7 @@ def register(mcp, client: RuoyiClient) -> None:
           book_id : 打卡书 id（🔴 字符串；list_books(book_type='daily_punch') 查，严禁编造）
           day     : 第几天（1 起正整数；同一 day 重灌 = 整天覆盖，agent 侧批量修正走这条路）
           goals   : 今日目标 ["乘法连续进位","小数退位减","年、月、日"]（简短短语，非整句）
-          modules : 模块数组，按卷面顺序排；两类结构 ——
+          modules : 模块数组，按卷面顺序排；三类结构 ——
             ① 计算模块（出题器现产，题目不在题库 → 内容随书存 content_json）：
                {"type":"oral|vertical|stepwise", "title":"口算题",
                 "items":[{"q":"357＋276＝","a":"633"}, ...]}
@@ -77,6 +77,18 @@ def register(mcp, client: RuoyiClient) -> None:
                🔴 qids = **题目 id 的字符串数组**（雪花号，search_questions / 生成器给的原样字符串）；
                🔴 **绝不传题面文本**——题面由 BE 按 biz_question_block.block_json 渲染，
                   改题库即改打卡书，零漂移（D5/D11）。传文本 = 制造第二个半源，必被打回。
+            ③ 结构型模块（2026-07-31 补，出题器没有这两型 → 由产线本地生成）：
+               二合一 {"type":"combine", "title":"把两个算式合并成一个综合算式",
+                       "items":[{"e1":"64−28＝36","e2":"36÷4＝9","a":"(64−28)÷4＝9"}, ...]}
+                 e1/e2 = 两个分步算式（含 ＝ 与结果），a = 综合算式（含 ＝ 与结果）。
+                 🔴 e2 的另一个操作数不得等于 e1 的结果，否则学生分不清哪个数是代进来的。
+               树状图 {"type":"tree", "title":"先填空，再列综合算式",
+                       "items":[{"l":24,"op1":"÷","r":6,"mid":4,"op2":"+","other":58,
+                                 "side":"l","total":62,"a":"24÷6＋58＝62"}, ...]}
+                 顶层 l op1 r = mid；中层 mid 与 other 经 op2 = total；
+                 side="l" 中层结果在左 / "r" 在右。题目卷 mid/total 留空框，解析卷填值。
+               两型自带作答位（横线/空框），BE 不追加留白区；**BE 不校验 items 结构**，
+               题面正确性由产线闸把关（举一反三产物/解题模型库/_验算/逐行恒等校验.py）。
 
         返回: {ok, node_id(str), item_ids:[str]}；未登录/参数不合法/BE 报错 → {ok:false, reason}。
         """
