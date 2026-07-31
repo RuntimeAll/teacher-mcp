@@ -55,6 +55,45 @@ def register(mcp, client: RuoyiClient) -> None:
         return {"ok": True, "book_id": str(resp.get("id")) if isinstance(resp, dict) else None}
 
     @mcp.tool(tags={"shelf"})
+    async def set_punch_layout(book_id: str, show_info: Optional[bool] = None,
+                               show_goals: Optional[bool] = None,
+                               show_wrong_log: Optional[bool] = None,
+                               reset: bool = False) -> dict:
+        """打卡书**版面开关**：让固定区块显示/隐藏，**不动任何题目内容**。
+
+        用途：同一套题换版面。比如「今日目标」对纯计算册是套话，关掉即可——
+        不必逐天重灌 goals，也不必改主题模板。
+
+        三个开关：
+          show_info      班级/姓名/日期栏（题目卷顶部）
+          show_goals     今日目标（题目卷）
+          show_wrong_log 今日错题记录（解析卷末尾，家长核对栏）
+        🔴 缺省全开，**只有显式传 False 才隐藏**；不传的键不动（老书零影响）。
+        reset=True → 清空全部开关，整本恢复默认全开。
+
+        展示页与导出 PDF 同源（都读 punch-v1 的 data.layout），改一次两边一起变。
+        参数 book_id 字符串传。返回 {ok, book_id, punch_layout}。
+        """
+        if not client.has_session():
+            return {"ok": False, "reason": "需先 login"}
+        if not str(book_id).strip():
+            return {"ok": False, "reason": "book_id 不能为空"}
+        body: dict = {}
+        if not reset:
+            for key, val in (("showInfo", show_info), ("showGoals", show_goals),
+                             ("showWrongLog", show_wrong_log)):
+                if val is not None:
+                    body[key] = bool(val)
+            if not body:
+                return {"ok": False, "reason": "至少给一个开关，或用 reset=True 恢复默认"}
+        try:
+            resp = await client.teacher_post(f"{BASE}/book/{book_id}/punch-layout", body)
+        except RuoyiError as e:
+            return {"ok": False, "reason": f"设置版面开关失败: {e}"}
+        return {"ok": True, "book_id": str(book_id),
+                "punch_layout": (resp or {}).get("punchLayout") if isinstance(resp, dict) else None}
+
+    @mcp.tool(tags={"shelf"})
     async def save_book_recipe(book_id: str, recipe: dict) -> dict:
         """给书挂**生产配方溯源**（资料工厂 ↔ 线上书绑定，零 DDL 落 style_meta_json.recipe）。
 
