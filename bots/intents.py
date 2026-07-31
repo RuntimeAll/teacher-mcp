@@ -1,12 +1,21 @@
 # -*- coding: utf-8 -*-
-"""PRD-016 教务速办机器人 · 意图与槽位抽取（SOP 路由层）。
+"""PRD-016 教务速办机器人 · 意图常量 + 槽位解析件。
 
-🔴 设计铁律（D3）：本模块**纯规则 + 正则，零 I/O、零 LLM**。
-LLM 只在 executor 里给「反馈文案」用，且产出只进反馈单五列字段（walled）。
-动作集之外一律 HELP（回能力清单），绝不放任模型自由发挥。
+🔴 2026-08-01 角色转变（换脑，务必看清，别把它当死代码删了）：
+    本模块**曾经是路由器**（一张 `_RE_*` 关键词表判 intent）。那张表已经拆掉了——
+    它没有「我不懂」这个出口，不认识的诉求会被表里最近的关键词抢走，于是装懂给个错
+    东西（老师说「重新记录课程**消耗**情况」被「消耗」二字判成查台账，是真实事故）。
 
-学生名不在这里正则——花名册是外部事实，由调用方把 roster 名单传进来做模糊匹配，
-本模块只负责「在文本里找出哪些花名册名字出现了」，保持无副作用可单测。
+    现在：**判 intent 的活全部归 brain.py（LLM）**。本模块只剩两个角色——
+      ① 常量表（意图枚举 / 学科码 / 能力清单）；
+      ② **校验器 + 兜底解析器**：parse_hours / parse_date / match_students 这一票函数
+         不再决定意图，只负责「LLM 没给出某个槽位时再捞一次」和格式复校。
+      ③ 唯一保留的直判 = 确认 / 取消 / 纯数字序号（零歧义、要秒回，不该等 LLM 往返）。
+
+    ❌ 绝不要因为「LLM 挂了」就把关键词路由加回来当降级——那正是翻车的老路。
+       理解层跑不通就诚实说没听懂（见 brain.DEGRADED_REPLY）。
+
+本模块仍然保持**零 I/O、零 LLM、无副作用可单测**：学生名靠调用方把 roster 传进来匹配。
 """
 
 import re
@@ -14,6 +23,7 @@ import re
 # ─────────────────────────── 意图常量 ───────────────────────────
 
 HELP = "help"                       # 能力清单（兜底）
+UNKNOWN = "unknown"                 # 🔴 没听懂——新增的「我不懂」出口，绝不滑向最近的关键词
 ACCOUNT_OPEN = "account_open"       # ① 开户 / 改单价（可带「顺手充值」）
 ACCOUNT_RECHARGE = "account_recharge"  # ① 充值
 ACCOUNT_ADJUST = "account_adjust"   # ① 调整（课时/金额增减）
@@ -26,6 +36,7 @@ LEDGER = "ledger"                   # ⑤ 查台账 / 流水 / 余额（只读�
 FAMILY_LEDGER = "family_ledger"     # ⑦ 家庭合并余额（只读）
 FAMILY_RECHARGE = "family_recharge"  # ⑦ 家庭充值 → 全额进钱包户（写）
 FAMILY_REBALANCE = "family_rebalance"  # ⑦ 归账对倒（写）
+INGEST_LESSON_LOG = "ingest_lesson_log"  # ⑧ 看手写课时本照片 → 补录历史场次 + 结算 + 充值（写）
 CONFIRM = "confirm"                 # 确认闸
 CANCEL = "cancel"                   # 取消
 CHOICE = "choice"                   # 歧义消解：回一个序号
@@ -33,10 +44,10 @@ CHOICE = "choice"                   # 歧义消解：回一个序号
 WRITE_INTENTS = {
     ACCOUNT_OPEN, ACCOUNT_RECHARGE, ACCOUNT_ADJUST,
     SETTLE_DO, LEAVE, FEEDBACK_TEXT, FEEDBACK_IMAGE,
-    FAMILY_RECHARGE, FAMILY_REBALANCE,
+    FAMILY_RECHARGE, FAMILY_REBALANCE, INGEST_LESSON_LOG,
 }
 
-CAPABILITY_LIST = """我只做教务速办这六件事（说人话就行）：
+CAPABILITY_LIST = """我做教务速办这几件事（说人话就行，不用背指令）：
 
 ① 账户｜开户 / 充值 / 调整
    · 给俊羽开个数学户 350 一节
@@ -52,14 +63,17 @@ CAPABILITY_LIST = """我只做教务速办这六件事（说人话就行）：
 ⑤ 查台账 / 流水 / 余额
    · 俊羽台账      · 俊羽还剩多少课时
 ⑥ 发作业图 → 自动整理反馈单
-   · 直接发图（可多张），发完说一句「生成反馈」
+   · 发学生做的题/板书照片（可多张），再说一句「看图写反馈」
 ⑦ 家庭钱包（好好 + 俊羽一家）
    · 他们家还剩多少     —— 两户金额相加的合计
    · 他们家充 7000      —— 全额充进家庭钱包户（俊羽户）
    · 归账              —— 好好户欠的钱从俊羽户对倒平掉
+⑧ 看手写课时本 → 补录历史记录
+   · 拍纸质课时本发我，再说「这是俊羽的课时记录，帮我补录进系统」
+   · 我逐行读给你看 → 你核对 → 确认后建场次 + 扣课时 + 补充值笔
 
 🔴 涉及钱和落库的操作我都会先回一条「预览」，你回「确认」我才真执行（10 分钟内有效）。
-其它需求我不支持——细改请上 H5：http://jpjia.cn/#/m/schedule"""
+🔴 没听懂我会直说「我不会」，不会硬猜一个最像的去做——细改请上 H5：http://jpjia.cn/#/m/schedule"""
 
 # ─────────────────────────── 词表 ───────────────────────────
 
@@ -233,88 +247,50 @@ def match_students(text, roster):
     return hits
 
 
-# ─────────────────────────── 意图判定 ───────────────────────────
-
-_RE_HELP = re.compile(r"帮助|能做(什么|啥)|你会(什么|啥)|功能|菜单|怎么用|help|指令|命令列表")
-_RE_FEEDBACK_IMG = re.compile(r"生成反馈|整理反馈|看图|读图|按图|图.{0,4}反馈|开始整理")
-_RE_FEEDBACK = re.compile(r"反馈单|写反馈|记反馈|反馈")
-_RE_LEAVE = re.compile(r"请假|冲正|销课|退课时|课取消|取消(这|那)?(节|场)")
-# 🔴「待结算」里的「结算」是名词不是命令 → 负向后顾把它挡在只读侧（自测抓到的真 bug）
-_RE_SETTLE_DO = re.compile(r"(?<!待)结算|结了|结掉|清了|清掉|都结|全结|结一下|结账|只结|单结")
-_RE_SETTLE_PENDING = re.compile(r"待结算|待办|没结|未结|几场|哪些课")
-_RE_OPEN = re.compile(r"开\S{0,3}户|建\S{0,2}户|新开|开个账|改单价|调单价|改价")
-_RE_RECHARGE = re.compile(r"充值|充\s*\d|充[了一两三四五六七八九十]|续费|交费|交了|续课")
-_RE_ADJUST = re.compile(r"调整|补\s*\d|补[了一两三四五六七八九十]|多扣|少扣|退还|修正")
-_RE_LEDGER = re.compile(r"台账|流水|余额|还剩|剩多少|剩几|账户|对账|消耗")
-# ⑦ 家庭钱包（写死好好+俊羽一家，不做通用配置）
-_RE_FAMILY = re.compile(r"他们家|她们家|俩家|一家|全家|家庭|家里|好好俊羽|俊羽好好|两个孩子|俩孩子|两个娃")
-_RE_REBALANCE = re.compile(r"归账|归拢|对倒|平账|轧账|抹平")
-_RE_MONEYQ = re.compile(r"多少钱|多少课时|几节|共多少|一共")
+# ─────────────────────────── 直判（唯一保留的规则判定） ───────────────────────────
+#
+# 🔴 这里只剩「确认 / 取消 / 纯数字序号」三种**单词**。
+#    它们零歧义、要秒回（等一次 LLM 往返太蠢），而且是确认闸的命脉——
+#    理解层挂了也必须能取消掉一条挂起的写操作。
+#    ⚠️ 任何「按关键词猜业务意图」的逻辑都不许再加回这里，那是 2026-07-31 翻车的根因。
 
 
-def detect(text, has_images=False):
-    """→ 意图常量。纯文本判定；has_images 只影响⑥的触发。"""
+def detect_direct(text):
+    """→ CONFIRM / CANCEL / CHOICE，或 None（= 交给 brain.understand 去理解）。"""
     t = (text or "").strip()
     if not t:
-        return HELP
+        return None
     if t in _CONFIRM_WORDS:
         return CONFIRM
     if t in _CANCEL_WORDS:
         return CANCEL
     if re.fullmatch(r"[1-9]\d?", t):
         return CHOICE
-    if _RE_HELP.search(t):
-        return HELP
-    # ⑦ 家庭钱包先判：「归账」独立触发；家庭词只有配上钱/余额问法才算家庭意图，
-    #    否则（如「他们家请假」）落回常规单人链路。
-    if _RE_REBALANCE.search(t):
-        return FAMILY_REBALANCE
-    if _RE_FAMILY.search(t):
-        if _RE_RECHARGE.search(t):
-            return FAMILY_RECHARGE
-        if _RE_LEDGER.search(t) or _RE_MONEYQ.search(t):
-            return FAMILY_LEDGER
-    # ⑥ 优先于④：手上有图 + 说了「生成反馈」= 走多模态；没图也说了 → 提示先发图
-    if _RE_FEEDBACK_IMG.search(t):
-        return FEEDBACK_IMAGE
-    if _RE_LEAVE.search(t):
-        return LEAVE
-    # 「把待办清了」= 执行；「有几场待结算」= 只读。先判执行词。
-    if _RE_SETTLE_DO.search(t):
-        return SETTLE_DO
-    if _RE_SETTLE_PENDING.search(t):
-        return SETTLE_PENDING
-    if _RE_FEEDBACK.search(t):
-        return FEEDBACK_IMAGE if has_images else FEEDBACK_TEXT
-    if _RE_OPEN.search(t):
-        return ACCOUNT_OPEN
-    if _RE_RECHARGE.search(t):
-        return ACCOUNT_RECHARGE
-    if _RE_ADJUST.search(t):
-        return ACCOUNT_ADJUST
-    if _RE_LEDGER.search(t):
-        return LEDGER
-    return HELP
+    return None
 
 
-def extract(intent, text, roster, today):
-    """按意图抽槽位 → dict（不含任何 I/O 结果；id 一律字符串）。"""
+# ─────────────────────────── 兜底槽位解析 ───────────────────────────
+
+
+def extract(text, roster, today):
+    """把一句话里能用正则捞的槽位全捞一遍 → dict（零 I/O，id 一律字符串）。
+
+    🔴 角色（2026-08-01 起）：**兜底解析器，不是路由器**。
+    调用方 = brain._backfill —— LLM 已经给出的槽位优先，这里只补 LLM 漏掉的那些。
+    所以本函数不再按 intent 分支（那时候是为了省无谓的解析），一律全解析；
+    多解析出来的槽位没人用也无害，漏解析才要命。
+    """
     t = text or ""
-    s = {
+    return {
         "students": match_students(t, roster),
         "subject": parse_subject(t),
         "date": parse_date(t, today),
         "note": parse_note(t),
+        "price": parse_price(t),
+        # 「按 1.5 课时扣」这种结算量优先，其次才是通用的「20 节」
+        "hours": parse_settle_hours(t) if parse_settle_hours(t) is not None else parse_hours(t),
+        "amount": parse_amount(t),
+        "timeNote": parse_time_note(t),
+        "sessionId": parse_session_id(t),
         "raw": t,
     }
-    if intent in (ACCOUNT_OPEN, ACCOUNT_RECHARGE, ACCOUNT_ADJUST, FAMILY_RECHARGE):
-        s["price"] = parse_price(t)
-        s["hours"] = parse_hours(t)
-        s["amount"] = parse_amount(t)
-    elif intent == SETTLE_DO:
-        s["hours"] = parse_settle_hours(t)
-        s["timeNote"] = parse_time_note(t)
-        s["sessionId"] = parse_session_id(t)
-    elif intent == LEAVE:
-        s["sessionId"] = parse_session_id(t)
-    return s

@@ -7,8 +7,11 @@
 🔴 边界：
 - 老机器人 /root/feishu-mcp-bot/（旧应用 cli_aa985…，PRD-007/009）一个字节不改；
   两个 app 各开各的长连接、各收各的事件流，互不抢。
-- BE 零改动、H5 零改动；LLM 只用于反馈五列文案（executor 里 walled）。
-- 六意图之外一律回能力清单——不做自由问答（SOP 纯度）。
+- BE 零改动、H5 零改动。
+- 🔴 2026-08-01 换脑：**理解层**（这句话是什么意图）交 LLM = brain.py；
+  **执行层**一个字没松——动作集固定、写库前必预览、必须「确认」才落库、
+  10 分钟过期、重复确认幂等。LLM 只产结构化意图和文案，永远不直接碰数据。
+- 动作集之外一律说「我不会」（不硬猜一个最像的去做），理解层跑不通就诚实降级。
 
 跑法：
   python3 jiaowu_bot.py            # 常驻（systemd jiaowu-bot.service）
@@ -27,6 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import intents as I           # noqa: E402
 import executor as X          # noqa: E402
+import brain as B             # noqa: E402
 from executor import BeError, log, money, h5, rows_text  # noqa: E402
 
 ENV_PATH = os.environ.get("JIAOWU_ENV", "/opt/jiaowu-push/.env")
@@ -35,20 +39,24 @@ IMG_DIR = os.environ.get("BOT_IMG_DIR", "/opt/jiaowu-push/img")
 CONFIRM_TTL = int(os.environ.get("CONFIRM_TTL", "600"))    # 确认态 10 分钟（D2）
 IMG_TTL = int(os.environ.get("IMG_TTL", "1800"))           # 图队列僵尸 30 分钟自清
 
-# 🔴 0 秒回执文案（老 bot PRD-007 停役前的体验遗产，2026-07-31 继承）：
-#    每个意图后面都有 roster + 若干 BE 往返，静默几秒足以让人怀疑"是不是又没回音了"。
-#    先顶一句"在干什么"，再回结果。写反馈类不在此表（act_feedback 自带开场白，避免连发两条）。
+# 🔴 0 秒回执（老 bot PRD-007 停役前的体验遗产）+ 路由透明化（2026-08-01 换脑后加的）：
+#    ① 理解层本身要跑一次 headless CLI（数秒），静默期必须先顶一句，否则又是"发完干等"。
+#    ② 理解完先把「我听成了什么」说出来——上一版翻车时老师完全看不见机器人的判断，
+#       只看到一个错结果。现在判断错了他第一时间就能喊停，而不是等到结果出来。
+#    写反馈两类不在此表（act_feedback / act_ingest_lesson_log 自带开场白，免连发两条）。
+_ACK_UNDERSTAND = "收到 ✓ 让我先听懂你要什么…"
+
 _ACK = {
-    "settle_pending": "收到 ✓ 正在查待结算…",
-    "settle_do":      "收到 ✓ 正在核对场次与单价，算给你看…",
-    "ledger":         "收到 ✓ 正在查台账…",
-    "family_ledger":  "收到 ✓ 正在合两户余额…",
-    "family_recharge": "收到 ✓ 正在算这笔充值…",
-    "family_rebalance": "收到 ✓ 正在算归账对倒…",
-    "account_open":   "收到 ✓ 正在准备开户…",
-    "account_recharge": "收到 ✓ 正在算这笔充值…",
-    "account_adjust": "收到 ✓ 正在准备调整…",
-    "leave":          "收到 ✓ 正在查这节课的状态…",
+    "settle_pending": "🧠 听成「查待结算」，正在查…",
+    "settle_do":      "🧠 听成「执行结算」，正在核对场次与单价…",
+    "ledger":         "🧠 听成「查台账」，正在查…",
+    "family_ledger":  "🧠 听成「查这一家的合并余额」，正在合两户…",
+    "family_recharge": "🧠 听成「家庭充值」，正在算…",
+    "family_rebalance": "🧠 听成「家庭归账对倒」，正在算…",
+    "account_open":   "🧠 听成「开户/改单价」，正在准备…",
+    "account_recharge": "🧠 听成「充值」，正在算…",
+    "account_adjust": "🧠 听成「账户调整」，正在准备…",
+    "leave":          "🧠 听成「请假冲正」，正在查这节课…",
 }
 
 # ───────────────────────────── 全局态 ─────────────────────────────
@@ -60,8 +68,12 @@ WHITELIST = {x for x in [(_env.get("FEISHU_USER_OPENID") or "").strip()] if x}
 BE = None            # 懒建（--sim 与常驻都用同一个）
 _lock = threading.RLock()
 _pending = None      # 待确认动作：{'op','args','preview','ts','done','result'}
-_choice = None       # 待消歧：{'kind','items','text','ts'}
-_images = []         # 待处理作业图：[{'path','ts'}]
+_choice = None       # 待消歧：{'kind','items','text','pre','ts'}
+# 🔴 待消费图片队列（2026-08-01 正名）：不再是"反馈专用队列"。
+#    收图时**不做任何思考**（不调 LLM、不猜图型），图先进队列等着，
+#    等下一条文本来了再由理解层决定谁来消费它；被某个动作消费掉就清空。
+_images = []         # [{'path','ts'}]
+_turn = None         # 本轮理解层结果 {'intent','slots'}，供 _ask_choice 原样带走免二次理解
 
 
 def be():
@@ -204,8 +216,10 @@ def do_confirm(rep):
         return
     p["done"] = True
     p["result"] = res["text"]
-    if p["op"] == "feedback" and p["args"].get("usedImages"):
-        img_clear()          # 图已被消费（反馈单已落库），清队列免二次误用
+    # 🔴 任何 op 都可以消费图队列（不只反馈）：落库成功且确实用了图 → 清队列免二次误用。
+    #    没被消费的图保留，等 IMG_TTL 自然过期。
+    if p["args"].get("usedImages"):
+        img_clear()
     rep.text(res["text"])
     if res.get("image_path"):
         try:
@@ -219,10 +233,16 @@ def do_confirm(rep):
 # ───────────────────────────── 槽位落地 ─────────────────────────────
 
 
-def _ask_choice(rep, kind, items, labeler, text, question):
+def _ask_choice(rep, kind, items, labeler, text, question, pre=None):
+    """挂一个「回序号」的消歧问句。
+
+    pre = 本轮理解层已经算出的 {'intent','slots'}——回序号后原样复用，
+    🔴 不再拿原文重跑一次 LLM（多花一次往返、还可能这次判成别的意图）。
+    """
     global _choice, _pending
     _pending = None
-    _choice = {"kind": kind, "items": items, "text": text, "ts": time.time()}
+    _choice = {"kind": kind, "items": items, "text": text,
+               "pre": pre if pre is not None else _turn, "ts": time.time()}
     lines = [question]
     for i, it in enumerate(items, 1):
         lines.append("  %d. %s" % (i, labeler(it)))
@@ -361,7 +381,10 @@ def act_settle_do(rep, slots, text, forced_student=None):
         pv.append("实际上课时间备注：%s" % note)
     if warn:
         pv.append("⚠️ %s 没开户，这几场会被系统跳过（不扣）。" % "、".join(sorted(set(warn))))
-    rep.text(set_pending("settle", {"items": items}, "\n".join(pv)))
+    # expect* = 预览侧算出的期望值。🔴 BE 的 /settle 只回「成功场次数」不回逐场明细，
+    # 回执里的「共扣多少」只能拿这里的期望值报（全成功时才等于实际）。
+    rep.text(set_pending("settle", {"items": items, "expectHours": tot_h,
+                                    "expectAmount": tot_a}, "\n".join(pv)))
 
 
 def act_account(rep, intent, slots, text, forced_student=None):
@@ -632,7 +655,9 @@ def act_feedback(rep, slots, text, use_images, forced_student=None):
     """④⑥ 写反馈 → 生成五列 → 预览（写，需确认）。"""
     imgs = img_paths() if use_images else []
     if use_images and not imgs:
-        rep.text("手上还没有图。先把作业照片发给我（可多张），发完说一句「生成反馈」。")
+        # 🔴 不再要求他背「生成反馈」这个暗号——理解层听得懂人话了
+        rep.text("手上还没有图。先把学生作业/板书照片发给我（可多张），"
+                 "再说一句「看图帮我写反馈」。")
         return
     st = resolve_student(rep, slots, text, forced_student)
     if not st:
@@ -663,37 +688,249 @@ def act_feedback(rep, slots, text, use_images, forced_student=None):
     rep.text(set_pending("feedback", args, "\n".join(pv)))
 
 
+# ───────────────────── ⑧ 看图补录课时本（2026-08-01 新增） ─────────────────────
+#
+# 场景：老师手上有一本手写课时本（纸），拍照发过来，把历史上课记录补进系统。
+# 两段式：① 读图 pass（brain.read_lesson_log，逐张 Read）② 预览 → 确认 → 执行。
+#
+# 🔴 为什么必须逐条摊开让他过目：这是**手写体**。日期/时间读错 = 系统里排错课、扣错钱，
+#    而且补录出来的是历史场次，错了要一条条去 H5 删。机器读完只是"线索"，他点头才是事实。
+
+
+def _sess_key(date, start):
+    return "%s %s" % (date, str(start or "")[:5])
+
+
+def act_ingest_lesson_log(rep, slots, text, forced_student=None):
+    """⑧ 看手写课时本 → 补录历史场次 + 扣课时 + 充值笔 → 预览（写，需确认）。"""
+    imgs = img_paths()
+    if not imgs:
+        rep.text("这个得看照片才能办。先把课时本拍给我（可多张），再说一句"
+                 "「这是俊羽的课时记录，帮我补录进系统」。")
+        return
+    st = resolve_student(rep, slots, text, forced_student)
+    if not st:
+        return
+    subject = pick_subject(slots, st)
+    acc = be().account_of(st, subject)
+    if not acc:
+        rep.text("%s 还没有 %s 账户，补录进去也没地方扣课时。先开户：给%s开个%s户 350 一节。"
+                 % (st["name"], subject, st["name"], subject))
+        return
+    price = float(acc.get("lessonPrice") or 0)
+
+    rep.text("收到 ✓ 正在逐张看这 %d 张课时本…手写体我会读得慢一点，"
+             "读完逐条列给你核对，你点头我才落库。" % len(imgs))
+    r = B.read_lesson_log(imgs, today(), st["name"])
+    if not r.get("ok"):
+        rep.text("这几张图我没读出来（读图模块没跑通），没有落任何库。"
+                 "要么重拍清楚一点再发，要么上 H5 手工补：%s" % h5("schedule"))
+        return
+    recs, notes = r["records"], r.get("notes") or ""
+    if not recs:
+        rep.text("图我逐张看了，但没认出一条完整的上课记录。%s\n"
+                 "换个角度重拍（表格拍正、别反光）再发一次试试。"
+                 % (("我读到的困难：%s" % notes) if notes else ""))
+        return
+
+    # ── ①a 时间列补位：日期读清了、只有时间没读清 → 拿这张表**自己**最常见的时段补上 ──
+    # 🔴 这不是"猜"：日期不可推断（读不出就必须挡下），但一本课时本的上课时段高度一致，
+    #    用同一张表里已经读清的多数时段填，是**代码侧有据可查的默认值**，且预览里逐条标出来。
+    #    实测踩点：模型在时间列个别字反光时会整行拒读，只因分钟数不确定就丢掉一整节课的账，
+    #    而那几行的日期和「扣 1 节」其实都由剩余列 9→0 交叉验过，挡掉太亏。
+    def _modal(key):
+        vals = [r.get(key) for r in recs if r.get(key)]
+        return max(set(vals), key=vals.count) if vals else None
+
+    m_start, m_end = _modal("start"), _modal("end")
+    timed = []
+    for rc in recs:
+        if rc.get("date") and m_start and m_end and not (rc.get("start") and rc.get("end")):
+            rc = dict(rc, start=rc.get("start") or m_start, end=rc.get("end") or m_end,
+                      _timeGuessed=True)
+        timed.append(rc)
+    recs = timed
+
+    # ── ① 分拣：读不全的 / 不在他说的日期范围内的 / 系统里已有的 / 真要建的 ──
+    d_from, d_to = slots.get("dateFrom"), slots.get("dateTo")
+    exist = set()
+    for s in be().sessions(st["id"]):
+        exist.add(_sess_key(s.get("sessionDate"), s.get("startTime")))
+
+    todo, broken, out_range, dup = [], [], [], []
+    for i, rc in enumerate(recs, 1):
+        if not (rc.get("date") and rc.get("start") and rc.get("end")):
+            broken.append((i, rc))
+            continue
+        if (d_from and rc["date"] < d_from) or (d_to and rc["date"] > d_to):
+            out_range.append(rc)
+            continue
+        if _sess_key(rc["date"], rc["start"]) in exist:
+            dup.append(rc)
+            continue
+        todo.append(rc)
+
+    if not todo:
+        why = []
+        if dup:
+            why.append("%d 条系统里已经有了" % len(dup))
+        if out_range:
+            why.append("%d 条不在你说的日期范围内" % len(out_range))
+        if broken:
+            why.append("%d 条关键字段没读清" % len(broken))
+        rep.text("没有需要补录的记录（%s）。没有落任何库。" % ("；".join(why) or "读出来是空的"))
+        return
+
+    # ── ② 组装 items / 结算量 / 充值笔 ──
+    items, hours_by_key, tot_h, guessed = [], {}, 0.0, []
+    for rc in todo:
+        hrs = rc.get("hours")
+        if hrs is None or hrs <= 0:
+            hrs = 1.0
+            guessed.append(rc["date"])
+        title = rc.get("title") or ""
+        items.append({"date": rc["date"], "start": rc["start"], "end": rc["end"],
+                      "sessionType": "1", "subject": subject,
+                      # 🔴 externalTitle 只有 sessionType='3' 才会被展示，但 '3' 不能结算
+                      #    （settleOne 直接拒），所以正课的上课内容只能落 note。两个都写：
+                      #    note 是 H5 排课页能看到的那一栏，externalTitle 留作原文存档。
+                      "externalTitle": title or None,
+                      "note": ("课时本补录：%s" % title) if title else "课时本补录"})
+        hours_by_key[_sess_key(rc["date"], rc["start"])] = hrs
+        tot_h += hrs
+    tot_a = tot_h * price
+
+    # 他明说「只补上课记录、充值我自己充过了」→ 充值笔整块不做（查不了重，只能听他的）
+    recharges = []
+    for rc in ([] if slots.get("noRecharge") else (r.get("recharges") or [])):
+        h, a = rc.get("hours"), rc.get("amount")
+        if h is not None and a is None:
+            a = h * price
+        if a is not None and h is None:
+            h = round(a / price, 2) if price else 0
+        d = rc.get("date")
+        recharges.append({"hours": h, "amount": a,
+                          "note": "%s 充值 %s 节（课时本补录）"
+                                  % (d or "（日期未读出）", money(h))})
+
+    # ── ③ 预览：逐条摊开让他核 ──
+    pv = ["【待确认 · 看课时本补录】学生：%s ｜ 学科：%s ｜ 单价 %s 元/节"
+          % (st["name"], subject, money(price)),
+          "",
+          "要补录这 %d 节课（建场次 + 当场扣课时）：" % len(items)]
+    for rc in todo:
+        hrs = hours_by_key[_sess_key(rc["date"], rc["start"])]
+        flags = []
+        if rc.get("_timeGuessed"):
+            flags.append("时间没读清，按本子上其它行的 %s-%s 计" % (m_start, m_end))
+        if rc["date"] in guessed:
+            flags.append("课时数没读出，按 1 节算")
+        pv.append("  · %s %s-%s ｜ %s ｜ 扣 %s 节%s"
+                  % (rc["date"], rc["start"], rc["end"], rc.get("title") or "（内容没读出）",
+                     money(hrs), ("（%s）" % "；".join(flags)) if flags else ""))
+    pv.append("")
+    pv.append("合计扣：%s 课时 / %s 元" % (money(tot_h), money(tot_a)))
+    # 上课内容整列没读出来（手写连笔+照片横放时常见）：账目照样是准的，但内容栏会是空的，
+    # 先把「值不值得重拍」这个选择摆给他，别让他确认完才发现内容全空。
+    n_blank = sum(1 for rc in todo if not rc.get("title"))
+    if n_blank >= max(2, len(todo) // 2):
+        pv.append("⚠️ 这 %d 节的**上课内容**我没认出来（手写连笔/照片横放），日期和课时是准的。"
+                  "内容栏留空不影响扣课时对账；想要内容就重拍一张摆正放大的、或直接把这几行"
+                  "内容打给我，我重新出预览。" % n_blank)
+    if dup:
+        pv.append("⏭ 跳过 %d 条（系统里同日同时段已经有了，不重复补）：%s"
+                  % (len(dup), "、".join("%s %s" % (x["date"], x["start"]) for x in dup[:8])))
+    if out_range:
+        pv.append("⏭ 跳过 %d 条（不在你说的 %s~%s 范围内）：%s"
+                  % (len(out_range), d_from or "…", d_to or "…",
+                     "、".join(str(x.get("date")) for x in out_range[:8])))
+    if broken:
+        pv.append("⚠️ 有 %d 条关键字段没读清，我**没有**猜，也不会补录，请自己看一眼："
+                  % len(broken))
+        for i, rc in broken[:6]:
+            pv.append("     第%d行：日期=%s 时间=%s~%s 内容=%s"
+                      % (i, rc.get("date") or "?", rc.get("start") or "?",
+                         rc.get("end") or "?", rc.get("title") or "?"))
+    if recharges:
+        pv.append("")
+        pv.append("还要补 %d 笔充值：" % len(recharges))
+        for rc in recharges:
+            pv.append("  · +%s 课时 / +%s 元 ｜ 备注「%s」"
+                      % (money(rc["hours"]), money(rc["amount"]), rc["note"]))
+        pv.append("🔴 充值这几行在台账上的**日期会记成今天**——系统的充值流水没有业务日期列，"
+                  "真实日期只能写在备注里。上课扣课时那些行不受影响，走的是场次日期，是对的。")
+        # 🔴 上课记录能按「同日同时段」查重，充值笔查不了（流水表没有业务日期列，
+        #    对不上"这笔是不是就是那笔"）。宁可把这个洞明说给他，也不要闷头充重。
+        pv.append("🔴 充值笔我**没法查重**（原因同上：流水表没有业务日期）。"
+                  "这几笔里只要有一笔你以前已经充过，就会重复充。已经充过的话回「取消」，"
+                  "改说一句「只补上课记录，不补充值」。")
+    elif slots.get("noRecharge") and (r.get("recharges") or []):
+        pv.append("")
+        pv.append("⏭ 图上那 %d 笔充值按你说的**不补**，只补上课记录。"
+                  % len(r.get("recharges") or []))
+    pv.append("")
+    pv.append("🔴 上面是**机器读手写体**的结果，请逐条对着本子核一遍再确认。")
+    pv.append("🔴 上课内容会记进场次备注（H5 排课页能看到）；课时流水单的「内容」列"
+              "系统固定显示「正课」，那是后端口径，不是没录进去。")
+    pv.append("确认后我会：建场次 → 立刻逐场结算 → 补充值笔 → 出一张课时流水单发你核对。"
+              "（补录的历史场次会瞬间进「待结算」，所以这三步我不停顿、一口气做完。）")
+    if notes:
+        pv.append("（我读图时拿不准的地方：%s）" % notes)
+
+    args = {"studentId": st["id"], "studentName": st["name"], "subject": subject,
+            "accountId": acc["id"], "items": items, "hoursByKey": hours_by_key,
+            "expectAmount": tot_a, "recharges": recharges, "usedImages": True}
+    rep.text(set_pending("ingest_lesson_log", args, "\n".join(pv)))
+
+
 # ───────────────────────────── 路由 ─────────────────────────────
 
 
-def dispatch(text, rep, forced_student=None, forced_session=None):
-    has_img = bool(img_paths())
-    intent = I.detect(text, has_img)
-    if intent == I.CONFIRM:
+def dispatch(text, rep, forced_student=None, forced_session=None, pre=None):
+    """一条文本 → 动作。pre = 已算好的 {'intent','slots'}（回序号复用，免二次理解）。"""
+    global _turn
+    # ── 第一段：直判（确认/取消/序号）。零歧义、要秒回，不走 LLM ──
+    direct = I.detect_direct(text)
+    if direct == I.CONFIRM:
         do_confirm(rep)
-        return intent
-    if intent == I.CANCEL:
+        return direct
+    if direct == I.CANCEL:
         global _pending, _choice
         had = bool(_pending or _choice)
         _pending, _choice = None, None
         rep.text("好，已取消。" if had else "没有正在等确认的操作。")
-        return intent
-    if intent == I.CHOICE:
+        return direct
+    if direct == I.CHOICE:
         resolve_choice(text, rep)
-        return intent
+        return direct
+
+    # ── 第二段：理解层（LLM）。🔴 不认识就说不会，绝不滑到最近的关键词上 ──
+    if pre is not None:
+        intent, slots, clarify, degraded = pre["intent"], pre["slots"], None, False
+        roster = be().roster()
+    else:
+        rep.text(_ACK_UNDERSTAND)
+        roster = be().roster()
+        u = B.understand(text, roster, today(), img_paths(), bool(_pending))
+        intent, slots, clarify, degraded = (u["intent"], u["slots"],
+                                            u.get("clarify"), u.get("degraded"))
+    _turn = {"intent": intent, "slots": slots}
+
+    if degraded:
+        # 🔴 降级：不猜、不执行、不回落旧关键词表——旧表正是 07-31 翻车的原因
+        rep.text(B.DEGRADED_REPLY)
+        return "degraded"
     if intent == I.HELP:
         rep.text(I.CAPABILITY_LIST)
         return intent
+    if intent == I.UNKNOWN:
+        rep.text(((clarify + "\n\n") if clarify else "这个我不会——我不太确定你要做什么。\n\n")
+                 + I.CAPABILITY_LIST)
+        return intent
 
-    # 🔴 0 秒回执（继承老 bot PRD-007 踩出来的体验经验，见其注释）：
-    #    "整件事最要命的体验问题就是发完消息干等好几分钟，不知道 bot 是在干活还是已经挂了"。
-    #    下面每个 act_* 都要先拉花名册再打 BE（少则 1 秒、多则十几秒），静默期必须先顶一句。
-    #    写反馈自己有开场白（act_feedback 里那句"正在整理"），不重复顶。
-    if intent not in (I.FEEDBACK_TEXT, I.FEEDBACK_IMAGE):
+    # ── 第三段：执行（动作集固定；写操作一律先预览再等「确认」） ──
+    if intent not in (I.FEEDBACK_TEXT, I.FEEDBACK_IMAGE, I.INGEST_LESSON_LOG):
         rep.text(_ACK.get(intent, "收到 ✓ 处理中…"))
-
-    roster = be().roster()
-    slots = I.extract(intent, text, roster, today())
     if intent == I.SETTLE_PENDING:
         act_settle_pending(rep)
     elif intent == I.SETTLE_DO:
@@ -710,9 +947,11 @@ def dispatch(text, rep, forced_student=None, forced_session=None):
         act_account(rep, intent, slots, text, forced_student)
     elif intent == I.LEAVE:
         act_leave(rep, slots, text, forced_student, forced_session)
+    elif intent == I.INGEST_LESSON_LOG:
+        act_ingest_lesson_log(rep, slots, text, forced_student)
     elif intent in (I.FEEDBACK_TEXT, I.FEEDBACK_IMAGE):
         act_feedback(rep, slots, text, intent == I.FEEDBACK_IMAGE, forced_student)
-    else:
+    else:                                   # 白名单已保证到不了这里，留个哑闸
         rep.text(I.CAPABILITY_LIST)
     return intent
 
@@ -732,12 +971,12 @@ def resolve_choice(text, rep):
         rep.text("序号超出范围，重新回一个 1~%d。" % len(c["items"]))
         return
     picked = c["items"][idx]
-    orig = c["text"]
+    orig, pre = c["text"], c.get("pre")
     _choice = None
     if c["kind"] == "student":
-        dispatch(orig, rep, forced_student=picked)
+        dispatch(orig, rep, forced_student=picked, pre=pre)
     else:
-        dispatch(orig, rep, forced_session=picked)
+        dispatch(orig, rep, forced_session=picked, pre=pre)
 
 
 # ───────────────────────────── 消息处理 ─────────────────────────────
@@ -774,7 +1013,9 @@ def handle_image(open_id, data, message_id, rep):
     ext = ".jpg" if data[:3] == b"\xff\xd8\xff" else ".png"
     try:
         os.makedirs(IMG_DIR, exist_ok=True)
-        path = os.path.join(IMG_DIR, "fb_in_%s%s" % (message_id, ext))
+        # 🔴 文件名前缀 in_（不再是 fb_in_）——fb_ 是老反馈机器人的遗物，
+        #    图队列早已不是"反馈专用"，留着前缀会让人以为进来的图都是作业照片。
+        path = os.path.join(IMG_DIR, "in_%s%s" % (message_id, ext))
         with open(path, "wb") as fh:
             fh.write(data)
     except Exception as e:  # noqa: BLE001
@@ -783,7 +1024,10 @@ def handle_image(open_id, data, message_id, rep):
         return "error"
     n = img_add(path)
     log("[收图] n=%d -> %s" % (n, path))
-    rep.text("已收到图片（当前 %d 张）。都发完后说一句「生成反馈 + 学生名」，我看图整理成反馈单。" % n)
+    # 🔴 收图不做任何思考：不调 LLM、不猜图型、不预设用途（上一版一律当作业照片，
+    #    老师发的手写课时本被回了句"发完说「生成反馈」"，图从头到尾没人看）。
+    #    图先躺队列里，等下一条文本来了由理解层决定谁消费。
+    rep.text("已收到图片（当前 %d 张）。需要我拿它做什么？" % n)
     return "image"
 
 
@@ -865,7 +1109,7 @@ def simulate(argv):
 
       --sim "文本"                     以白名单身份发一条文本
       --sim-as <openid> "文本"         指定发信人（测白名单拒绝）
-      --sim-img <图路径> "文本"        先把本地图塞进队列再发文本（测意图⑥多模态链）
+      --sim-img <图路径> "文本"        先把本地图塞进队列再发文本（测⑥/⑧读图链）
     """
     if argv[0] == "--sim-as":
         open_id, texts = argv[1], argv[2:]

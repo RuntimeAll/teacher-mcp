@@ -189,6 +189,28 @@ class Be(object):
         return self.call("/teacher/schedule/settle",
                          {"items": items, "genFeedback": bool(gen_feedback)})
 
+    def session_batch(self, target_id, items, plan_id=None, force=True):
+        """批量建场次（⑧ 补录用）→ {'created':[sessionVo], 'conflicts':[...]}。
+
+        🔴 targetType 必须 '0'（学生）——实证过 BE：'1' 是**班级**，
+        班课既进不了 /settle/pending，settleOne 也直接抛「班课暂不支持结算」，
+        补录出来的场次会变成永远结不掉的孤儿。
+        🔴 planId=None 时服务端 autoBind 自动失效（batch() 里 `autoBind && planId != null`），
+        不会去抢占课程计划的未排课次——补录只补「上过的课」，不动备课线。
+        🔴 force=True：重复防线由调用方**建之前查同日同时段**负责（见 _op_ingest_lesson_log），
+        不靠服务端冲突检测——它 force=False 时是「有一条冲突就整批不建」，粒度太粗。
+        """
+        body = {"targetType": "0", "targetId": str(target_id), "planId": plan_id,
+                "autoBind": False, "force": bool(force), "items": items}
+        return self.call("/teacher/schedule/session/batch", body) or {}
+
+    def export_ledger_png(self, account_id):
+        """课时流水单 PNG → {'file','url'}。
+
+        🔴 真实 path = /export-ledger-png（不是 /ledger-png，已回 TuitionAccountController 核实）。
+        """
+        return self.call("/teacher/schedule/account/%s/export-ledger-png" % account_id, {})
+
     def leave(self, session_id):
         return self.call("/teacher/schedule/session/%s/leave" % session_id, {})
 
@@ -281,18 +303,27 @@ def _sanitize(rows):
     return out
 
 
-def _run_claude(prompt, image_paths=None, timeout=None):
+def _run_claude(prompt, image_paths=None, timeout=None, system=None):
     """headless claude CLI（订阅，不引入新 LLM key）。失败/超时返 ''。
 
-    🔴 walled：不挂任何 MCP，只放 Read（⑥ 读本地作业图）；产出只用于五列字段。
+    🔴 walled：不挂任何 MCP，只放 Read（读本地图片）；产出只准进结构化字段，
+    绝不直接当动作执行——写库永远要过 run_op + 确认闸。
+
+    system = 本次的 wall（默认 = 反馈五列的 _WALL_PROMPT）。
+    brain.py 的路由 pass / 读图 pass 各带自己的 wall 走这里，共用同一条 CLI 通路。
     """
     cmd = [CLAUDE_BIN, "-p", prompt, "--output-format", "json",
-           "--allowedTools", "Read", "--append-system-prompt", _WALL_PROMPT]
+           "--allowedTools", "Read", "--append-system-prompt", system or _WALL_PROMPT]
     model = os.environ.get("CLAUDE_MODEL", "").strip()
     if model:
         cmd += ["--model", model]
     try:
+        # 🔴 必须显式 encoding="utf-8"：text=True 走的是**系统 locale**，
+        #    非 UTF-8 环境（Windows GBK，或 systemd 没带 LANG 的裸环境）读中文输出会
+        #    UnicodeDecodeError 崩在 subprocess 的读线程里 → 这里拿到空串 → 静默降级，
+        #    看起来就像"模型没跑通"。errors="replace" 保证再脏的字节也不炸。
         p = subprocess.run(cmd, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace",
                            timeout=timeout or CLI_TIMEOUT, stdin=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
         log("claude CLI 超时 %ss" % (timeout or CLI_TIMEOUT))
@@ -312,6 +343,12 @@ def _run_claude(prompt, image_paths=None, timeout=None):
         return str(ev.get("result") or "")
     except Exception:
         return p.stdout or ""
+
+
+# 🔴 对外别名：brain.py（理解层）复用同一条 CLI 通路与同一个 JSON 抠取器，
+#    避免两处各写一份、行为漂移。下划线版保留给本模块内部老调用点。
+run_claude = _run_claude
+extract_json = _extract_json
 
 
 def _fallback_rows(brief):
@@ -424,19 +461,33 @@ def _op_account_flow(be, a):
 
 # ---- ② 一键结算 ----
 
-def _op_settle(be, a):
-    r = be.settle(a["items"], gen_feedback=False) or {}
-    settled = r.get("settled") or []
+def settle_lines(r, n_req, exp_hours=None, exp_amount=None):
+    """结算返回 → 回执行列表（⑧ 补录也复用这段，口径一处定义）。
+
+    🔴 BE 契约实证（SettlementService.settle）：`settled` 是**结算成功的场次数（int）**，
+    不是逐场明细数组。老代码按数组遍历它（sum/len/切片），真跑必 TypeError——
+    确认闸之前一直用打桩 executor 回归，所以这个雷一直没炸。逐场金额只能靠预览侧算的
+    期望值来报（exp_*），BE 这里不给。
+    """
+    ok = int(r.get("settled") or 0)
     skipped = r.get("skipped") or []
-    tot_h = sum(float(x.get("hours") or 0) for x in settled)
-    tot_a = sum(float(x.get("amount") or 0) for x in settled)
-    lines = ["✅ 已结算 %d 场：共扣 %s 课时 / %s 元" % (len(settled), money(tot_h), money(tot_a))]
-    for x in settled[:8]:
-        lines.append("  · 场次 %s 扣 %s 课时 / %s 元" % (x.get("sessionId"), money(x.get("hours")), money(x.get("amount"))))
+    head = "✅ 已结算 %d 场" % ok
+    if ok == n_req and exp_hours is not None:
+        head += "：共扣 %s 课时 / %s 元" % (money(exp_hours), money(exp_amount or 0))
+    elif exp_hours is not None:
+        head += "（原计划 %d 场，预估共扣 %s 课时；实际以下方跳过清单为准）" % (n_req, money(exp_hours))
+    lines = [head]
     if skipped:
         lines.append("⚠️ 跳过 %d 场：" % len(skipped))
-        for x in skipped[:6]:
+        for x in skipped[:8]:
             lines.append("  · 场次 %s —— %s" % (x.get("sessionId"), x.get("reason")))
+    return lines
+
+
+def _op_settle(be, a):
+    items = a["items"]
+    r = be.settle(items, gen_feedback=False) or {}
+    lines = settle_lines(r, len(items), a.get("expectHours"), a.get("expectAmount"))
     lines.append("👉 %s" % h5("settle"))
     return {"text": "\n".join(lines), "image_path": None}
 
@@ -523,6 +574,92 @@ def _op_family_rebalance(be, a):
     return {"text": "\n".join(lines), "image_path": None}
 
 
+# ---- ⑧ 看图补录课时本（建场次 → 立刻逐场结算 → 充值笔，一个 op 里连续做完） ----
+
+
+def _op_ingest_lesson_log(be, a):
+    """把手写课时本的历史记录补进系统。args 由 jiaowu_bot 的预览段备好。
+
+    🔴 为什么建场次和结算必须挤在同一个 op 里、中间不留窗口：
+       /settle/pending = 「结束时间已过 + 已排 + 未结」。补录建的全是历史场次，
+       建完的那一瞬间它们**全部涌进老师的待结算列表**。中间只要一断，
+       他的待办就凭空多出十几条，比不补录还糟。所以这里不设第二道确认。
+
+    🔴 顺序 = 建场次 → 逐场结算 → 充值笔（用户拍板口径）。
+       副作用：充值在最后，账户余额会先被扣成负数再被充回来，
+       台账里 hoursAfter 中途为负是正常的（系统本来就允许欠费），最终值正确。
+    """
+    items = a["items"]                      # [{date,start,end,sessionType,subject,externalTitle,note}]
+    hours_by_key = a["hoursByKey"]          # {"YYYY-MM-DD HH:mm": 实扣课时}
+    lines = []
+
+    # ① 建场次
+    r = be.session_batch(a["studentId"], items) or {}
+    created = r.get("created") or []
+    if not created:
+        raise BeError("一条场次都没建成（BE 返回 created 为空，conflicts=%d）。没有落库，可重发。"
+                      % len(r.get("conflicts") or []))
+    lines.append("✅ 已补建 %d 场历史场次" % len(created))
+    if len(created) != len(items):
+        lines.append("⚠️ 提交 %d 条只建成 %d 条，缺的那几条请到 H5 手工补：%s"
+                     % (len(items), len(created), h5("schedule")))
+
+    # ② 立刻逐场结算（🔴 不留窗口；genFeedback=False，补录不建反馈壳）
+    st_items, exp_h = [], 0.0
+    for s in created:
+        key = "%s %s" % (s.get("sessionDate"), str(s.get("startTime"))[:5])
+        hrs = float(hours_by_key.get(key) or 1.0)
+        exp_h += hrs
+        st_items.append({"sessionId": str(s.get("id")), "hours": hrs})
+    try:
+        sr = be.settle(st_items, gen_feedback=False) or {}
+    except BeError as e:
+        # 半单：场次已建、结算没跑 → 老师的待结算列表会突然多出一堆，必须喊出来
+        raise BeError(
+            "⚠️ 补录只完成一半！%d 场历史场次**已经建好**，但批量结算失败（%s）。"
+            "这些场次现在全躺在你的「待结算」里。请发一句「把待办清了」补结算，"
+            "或上 H5 处理：%s" % (len(created), e, h5("settle")))
+    lines += settle_lines(sr, len(st_items), exp_h, a.get("expectAmount"))
+    n_skip = len(sr.get("skipped") or [])
+    if n_skip:
+        lines.append("⚠️ 上面跳过的场次已经建在系统里但没扣课时，正躺在「待结算」，"
+                     "发「把待办清了」可以补结。")
+
+    # ③ 充值笔（🔴 biz_tuition_flow 没有业务日期列，充值行的台账日期 = 今天，
+    #    只能靠 note 把真实日期写进去；预览里已经跟老师明说过）
+    ok_rc, bad_rc = 0, []
+    for rc in (a.get("recharges") or []):
+        try:
+            be.add_flow(a["accountId"], "1", rc.get("hours") or 0, rc.get("amount") or 0,
+                        rc.get("note") or "补录充值")
+            ok_rc += 1
+        except BeError as e:
+            bad_rc.append("%s（%s）" % (rc.get("note") or "充值", e))
+    if ok_rc:
+        lines.append("✅ 已补 %d 笔充值（台账日期记为今天，真实日期写在备注里）" % ok_rc)
+    if bad_rc:
+        lines.append("⚠️ 有 %d 笔充值没进去，请到 H5 手工补：%s\n   · %s"
+                     % (len(bad_rc), h5("account"), "\n   · ".join(bad_rc)))
+
+    # ④ 回执：拉最新余额 + 出流水单 PNG 给他核对
+    be.roster(force=True)
+    for st in be.roster():
+        if str(st.get("id")) == str(a["studentId"]):
+            acc = be.account_of(st, a.get("subject"))
+            if acc:
+                lines.append("📊 %s 当前余额：%s 课时 / %s 元"
+                             % (a["studentName"], money(acc.get("hoursRemain")),
+                                money(acc.get("amountRemain"))))
+    img = None
+    try:
+        img = (be.export_ledger_png(a["accountId"]) or {}).get("url")
+        lines.append("🖼 课时流水单已生成，随后发出，请对着课时本核一遍。")
+    except BeError as e:
+        lines.append("⚠️ 流水单出图失败（数据已落库）：%s" % e)
+    lines.append("👉 %s" % h5("account"))
+    return {"text": "\n".join(lines), "image_path": img}
+
+
 _OPS = {
     "account_open": _op_account_open,
     "account_flow": _op_account_flow,
@@ -530,4 +667,5 @@ _OPS = {
     "leave": _op_leave,
     "feedback": _op_feedback,
     "family_rebalance": _op_family_rebalance,
+    "ingest_lesson_log": _op_ingest_lesson_log,
 }
