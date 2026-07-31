@@ -457,6 +457,151 @@ def act_leave(rep, slots, text, forced_student=None, forced_session=None):
     rep.text(set_pending("leave", {"sessionId": str(ses["id"]), "desc": desc}, "\n".join(pv)))
 
 
+# ───────────────────────── ⑦ 家庭钱包（好好 + 俊羽） ─────────────────────────
+#
+# 🔴 零 BE 改动的「家庭钱包」玩法（2026-07-31 用户拍板，写死这一家不做通用配置）：
+#   钱包户 = 俊羽户，家里的钱全额充这里；好好户不充值，一路走负数（系统允许欠费）；
+#   家庭真实余额 = 两户 amountRemain 相加。机器人把这套体验包掉。
+#   两人单价/时长不同（俊羽 1.5h、好好 1h），所以**共享的是钱不是节**：
+#   合并只加金额、归账只倒金额，课时列永远各归各户。
+
+FAMILY = {
+    "label": "好好 + 俊羽（一家）",
+    "wallet_id": "60",                 # 俊羽 = 家庭钱包户
+    "wallet_name": "俊羽",
+    "member_ids": ["60", "59"],        # 俊羽、好好（合计口径按此顺序展示）
+}
+
+
+def _family_members():
+    """→ [(学生行, 账户 or None)]，按 FAMILY.member_ids 顺序；缺员静默跳过。"""
+    by_id = {str(s.get("id")): s for s in be().roster()}
+    out = []
+    for mid in FAMILY["member_ids"]:
+        st = by_id.get(mid)
+        if st:
+            out.append((st, be().account_of(st, None)))
+    return out
+
+
+def _family_total(members):
+    return sum(float((acc or {}).get("amountRemain") or 0) for _, acc in members)
+
+
+def act_family_ledger(rep):
+    """⑦-1 合并查询：合计一行 + 各自明细。只读免确认。"""
+    members = _family_members()
+    if not members:
+        rep.text("花名册里没找到这一家的学生，先确认档案还在。")
+        return
+    total = _family_total(members)
+    out = ["👪 %s · 家庭钱包" % FAMILY["label"],
+           "💰 合计余额：%s 元" % money(total), "", "各户明细："]
+    for st, acc in members:
+        tag = "（家庭钱包户）" if str(st.get("id")) == FAMILY["wallet_id"] else ""
+        if not acc:
+            out.append("· %s%s：未开户（按 0 计）" % (st.get("name"), tag))
+            continue
+        amt = float(acc.get("amountRemain") or 0)
+        out.append("· %s%s：%s 元 ｜ %s 课时 ｜ 单价 %s 元/节%s"
+                   % (st.get("name"), tag, money(amt), money(acc.get("hoursRemain")),
+                      money(acc.get("lessonPrice")), "  ⚠️欠费" if amt < 0 else ""))
+    out.append("")
+    out.append("（钱全额充在%s户，%s户不充、一路走负数；合计=两户相加才是家里的真实余额）"
+               % (FAMILY["wallet_name"],
+                  "、".join(s.get("name") for s, _ in members
+                            if str(s.get("id")) != FAMILY["wallet_id"])))
+    debt = [s.get("name") for s, a in members if float((a or {}).get("amountRemain") or 0) < 0]
+    if debt:
+        out.append("要把 %s 户的负数抹平就说一句「归账」。" % "、".join(debt))
+    out.append("👉 %s" % h5("account"))
+    rep.text("\n".join(out))
+
+
+def act_family_recharge(rep, slots):
+    """⑦-2 家庭充值 → 全额进钱包户（俊羽），走现有充值链。"""
+    members = _family_members()
+    wallet = next(((s, a) for s, a in members if str(s.get("id")) == FAMILY["wallet_id"]), None)
+    if not wallet:
+        rep.text("没找到家庭钱包户（%s），先确认档案。" % FAMILY["wallet_name"])
+        return
+    st, acc = wallet
+    if not acc:
+        rep.text("家庭钱包户（%s）还没开户，先说：给%s开个数学户 350 一节。"
+                 % (st["name"], st["name"]))
+        return
+    price = float(acc.get("lessonPrice") or 0)
+    hours, amount = slots.get("hours"), slots.get("amount")
+    if hours is None and amount is None:
+        rep.text("家里充多少？说个数，比如：他们家充 7000。")
+        return
+    if hours is not None and amount is None:
+        amount = hours * price
+    if amount is not None and hours is None:
+        hours = round(amount / price, 2) if price else 0
+    total = _family_total(members)
+    pv = ["【待确认 · 家庭充值】",
+          "🔴 家庭钱包 = %s户，这笔钱全额充进%s户（另一个孩子的户不充、照常走负数）"
+          % (st["name"], st["name"]),
+          "学科：%s ｜ 单价：%s 元/节" % (acc.get("subjectLabel") or "数学", money(price)),
+          "金额：+%s 元" % money(amount),
+          "课时：+%s 节（按%s单价折算，记在%s户）" % (money(hours), st["name"], st["name"]),
+          "",
+          "%s户：%s 课时 / %s 元 → 约 %s 课时 / %s 元"
+          % (st["name"], money(acc.get("hoursRemain")), money(acc.get("amountRemain")),
+             money(float(acc.get("hoursRemain") or 0) + hours),
+             money(float(acc.get("amountRemain") or 0) + amount)),
+          "家庭合计：%s 元 → %s 元" % (money(total), money(total + amount))]
+    if slots.get("note"):
+        pv.append("备注：%s" % slots["note"])
+    args = {"accountId": acc["id"], "studentId": st["id"], "studentName": st["name"],
+            "subject": acc.get("subjectLabel"), "flowType": "1", "hours": hours,
+            "amount": amount, "note": slots.get("note") or "家庭充值"}
+    rep.text(set_pending("account_flow", args, "\n".join(pv)))
+
+
+def act_family_rebalance(rep):
+    """⑦-3 归账对倒：欠费户补齐、钱包户等额扣，一次确认打包两条调整。"""
+    members = _family_members()
+    wallet = next(((s, a) for s, a in members if str(s.get("id")) == FAMILY["wallet_id"]), None)
+    debts = [(s, a) for s, a in members
+             if str(s.get("id")) != FAMILY["wallet_id"] and a
+             and float(a.get("amountRemain") or 0) < 0]
+    if not wallet or not wallet[1]:
+        rep.text("家庭钱包户（%s）还没开户，没法归账。" % FAMILY["wallet_name"])
+        return
+    if not debts:
+        others = [s.get("name") for s, a in members if str(s.get("id")) != FAMILY["wallet_id"]]
+        rep.text("✅ 无需归账：%s 户余额没有负数（未开户或已 ≥ 0）。\n👉 %s"
+                 % ("、".join(others) or "另一个", h5("account")))
+        return
+    if len(debts) > 1:                   # 本家只有两口，留个防呆
+        rep.text("这一家有多个欠费户，机器人只处理单个，请上 H5 手工归账：%s" % h5("account"))
+        return
+    dst, dacc = debts[0]
+    wst, wacc = wallet
+    deficit = -float(dacc.get("amountRemain") or 0)
+    total = _family_total(members)
+    pv = ["【待确认 · 家庭归账（两条调整打包）】",
+          "%s户欠 %s 元 → 从「%s户（家庭钱包）」等额对倒平掉。" % (dst["name"], money(deficit), wst["name"]),
+          "",
+          "① %s户：金额 +%s 元 → %s 元（归零）" % (dst["name"], money(deficit),
+                                            money(float(dacc.get("amountRemain") or 0) + deficit)),
+          "② %s户：金额 -%s 元 → %s 元" % (wst["name"], money(deficit),
+                                       money(float(wacc.get("amountRemain") or 0) - deficit)),
+          "备注都记「家庭归账」。",
+          "",
+          "🔴 只倒金额列，两边课时列都不动——两人单价时长不同，课时跨户搬就失真了；",
+          "   家里共享的是钱不是节。%s户课时仍是 %s（她自己那本账照旧）。"
+          % (dst["name"], money(dacc.get("hoursRemain"))),
+          "家庭合计余额：%s 元 → %s 元（对倒不改变合计，只是换个口袋）"
+          % (money(total), money(total))]
+    args = {"debtAccountId": dacc["id"], "debtName": dst["name"],
+            "walletAccountId": wacc["id"], "walletName": wst["name"],
+            "amount": deficit, "memberIds": FAMILY["member_ids"], "note": "家庭归账"}
+    rep.text(set_pending("family_rebalance", args, "\n".join(pv)))
+
+
 def _find_sheet(be_, target_id, lesson_date, session_id=None):
     """同日/同场已有反馈单（含结算生成的空壳）→ 复用其 id，避免建重复单。"""
     for s in be_.sheets(target_id):
@@ -532,6 +677,12 @@ def dispatch(text, rep, forced_student=None, forced_session=None):
         act_settle_do(rep, slots, text, forced_student)
     elif intent == I.LEDGER:
         act_ledger(rep, slots, text, forced_student)
+    elif intent == I.FAMILY_LEDGER:
+        act_family_ledger(rep)
+    elif intent == I.FAMILY_RECHARGE:
+        act_family_recharge(rep, slots)
+    elif intent == I.FAMILY_REBALANCE:
+        act_family_rebalance(rep)
     elif intent in (I.ACCOUNT_OPEN, I.ACCOUNT_RECHARGE, I.ACCOUNT_ADJUST):
         act_account(rep, intent, slots, text, forced_student)
     elif intent == I.LEAVE:

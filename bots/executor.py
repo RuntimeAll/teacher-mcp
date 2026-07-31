@@ -486,10 +486,48 @@ def _op_feedback(be, a):
     return {"text": "\n".join(lines), "image_path": img}
 
 
+# ---- ⑦ 家庭归账对倒（好好欠额 ← 俊羽钱包，一次确认打包两条调整） ----
+
+def _op_family_rebalance(be, a):
+    """🔴 只倒金额列，课时列两边都不动（两人单价时长不同，课时跨户即失真）。
+
+    BE 契约允许 hoursDelta=0 而 amountDelta≠0（约束只是两者不能同时为 0），
+    所以金额单列对倒是干净可行的，不必拿课时凑数。
+    """
+    amt = float(a["amount"])
+    note = a.get("note") or "家庭归账"
+    # 先补欠方（把负数抹平，这是老师最想看到的那一列），再从钱包户扣。
+    be.add_flow(a["debtAccountId"], "4", 0, amt, note)
+    try:
+        be.add_flow(a["walletAccountId"], "4", 0, -amt, note)
+    except BeError as e:
+        # 半单：欠方已补、钱包未扣 → 家庭合计会虚高，必须喊出来并给回滚指令
+        raise BeError(
+            "⚠️ 归账只完成一半！%s 户已补 +%s 元，但 %s 户扣款失败（%s）。"
+            "家庭合计目前虚高 %s 元，请到 H5 给 %s 户手工补一笔 -%s 元调整。"
+            % (a["debtName"], money(amt), a["walletName"], e, money(amt),
+               a["walletName"], money(amt)))
+    be.roster(force=True)
+    lines = ["✅ 家庭归账完成：%s 元已从「%s（家庭钱包）」对倒给「%s」"
+             % (money(amt), a["walletName"], a["debtName"]),
+             "  · %s 户：+%s 元（欠额归零）" % (a["debtName"], money(amt)),
+             "  · %s 户：-%s 元" % (a["walletName"], money(amt)),
+             "（只倒金额，两边课时列均未改动）"]
+    tot = 0.0
+    for st in be.roster():
+        if str(st.get("id")) in a.get("memberIds", []):
+            for acc in (st.get("accounts") or []):
+                tot += float(acc.get("amountRemain") or 0)
+    lines.append("📊 家庭合计余额：%s 元（对倒不改变合计）" % money(tot))
+    lines.append("👉 %s" % h5("account"))
+    return {"text": "\n".join(lines), "image_path": None}
+
+
 _OPS = {
     "account_open": _op_account_open,
     "account_flow": _op_account_flow,
     "settle": _op_settle,
     "leave": _op_leave,
     "feedback": _op_feedback,
+    "family_rebalance": _op_family_rebalance,
 }

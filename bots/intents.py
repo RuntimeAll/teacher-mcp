@@ -23,6 +23,9 @@ LEAVE = "leave"                     # ③ 请假冲正（写）
 FEEDBACK_TEXT = "feedback_text"     # ④ 口述要点写反馈（写）
 FEEDBACK_IMAGE = "feedback_image"   # ⑥ 作业图 → 多模态建反馈单（写）
 LEDGER = "ledger"                   # ⑤ 查台账 / 流水 / 余额（只读）
+FAMILY_LEDGER = "family_ledger"     # ⑦ 家庭合并余额（只读）
+FAMILY_RECHARGE = "family_recharge"  # ⑦ 家庭充值 → 全额进钱包户（写）
+FAMILY_REBALANCE = "family_rebalance"  # ⑦ 归账对倒（写）
 CONFIRM = "confirm"                 # 确认闸
 CANCEL = "cancel"                   # 取消
 CHOICE = "choice"                   # 歧义消解：回一个序号
@@ -30,6 +33,7 @@ CHOICE = "choice"                   # 歧义消解：回一个序号
 WRITE_INTENTS = {
     ACCOUNT_OPEN, ACCOUNT_RECHARGE, ACCOUNT_ADJUST,
     SETTLE_DO, LEAVE, FEEDBACK_TEXT, FEEDBACK_IMAGE,
+    FAMILY_RECHARGE, FAMILY_REBALANCE,
 }
 
 CAPABILITY_LIST = """我只做教务速办这六件事（说人话就行）：
@@ -49,6 +53,10 @@ CAPABILITY_LIST = """我只做教务速办这六件事（说人话就行）：
    · 俊羽台账      · 俊羽还剩多少课时
 ⑥ 发作业图 → 自动整理反馈单
    · 直接发图（可多张），发完说一句「生成反馈」
+⑦ 家庭钱包（好好 + 俊羽一家）
+   · 他们家还剩多少     —— 两户金额相加的合计
+   · 他们家充 7000      —— 全额充进家庭钱包户（俊羽户）
+   · 归账              —— 好好户欠的钱从俊羽户对倒平掉
 
 🔴 涉及钱和落库的操作我都会先回一条「预览」，你回「确认」我才真执行（10 分钟内有效）。
 其它需求我不支持——细改请上 H5：http://jpjia.cn/#/m/schedule"""
@@ -238,6 +246,10 @@ _RE_OPEN = re.compile(r"开\S{0,3}户|建\S{0,2}户|新开|开个账|改单价|�
 _RE_RECHARGE = re.compile(r"充值|充\s*\d|充[了一两三四五六七八九十]|续费|交费|交了|续课")
 _RE_ADJUST = re.compile(r"调整|补\s*\d|补[了一两三四五六七八九十]|多扣|少扣|退还|修正")
 _RE_LEDGER = re.compile(r"台账|流水|余额|还剩|剩多少|剩几|账户|对账|消耗")
+# ⑦ 家庭钱包（写死好好+俊羽一家，不做通用配置）
+_RE_FAMILY = re.compile(r"他们家|她们家|俩家|一家|全家|家庭|家里|好好俊羽|俊羽好好|两个孩子|俩孩子|两个娃")
+_RE_REBALANCE = re.compile(r"归账|归拢|对倒|平账|轧账|抹平")
+_RE_MONEYQ = re.compile(r"多少钱|多少课时|几节|共多少|一共")
 
 
 def detect(text, has_images=False):
@@ -253,6 +265,15 @@ def detect(text, has_images=False):
         return CHOICE
     if _RE_HELP.search(t):
         return HELP
+    # ⑦ 家庭钱包先判：「归账」独立触发；家庭词只有配上钱/余额问法才算家庭意图，
+    #    否则（如「他们家请假」）落回常规单人链路。
+    if _RE_REBALANCE.search(t):
+        return FAMILY_REBALANCE
+    if _RE_FAMILY.search(t):
+        if _RE_RECHARGE.search(t):
+            return FAMILY_RECHARGE
+        if _RE_LEDGER.search(t) or _RE_MONEYQ.search(t):
+            return FAMILY_LEDGER
     # ⑥ 优先于④：手上有图 + 说了「生成反馈」= 走多模态；没图也说了 → 提示先发图
     if _RE_FEEDBACK_IMG.search(t):
         return FEEDBACK_IMAGE
@@ -286,7 +307,7 @@ def extract(intent, text, roster, today):
         "note": parse_note(t),
         "raw": t,
     }
-    if intent in (ACCOUNT_OPEN, ACCOUNT_RECHARGE, ACCOUNT_ADJUST):
+    if intent in (ACCOUNT_OPEN, ACCOUNT_RECHARGE, ACCOUNT_ADJUST, FAMILY_RECHARGE):
         s["price"] = parse_price(t)
         s["hours"] = parse_hours(t)
         s["amount"] = parse_amount(t)
