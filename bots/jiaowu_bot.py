@@ -689,11 +689,16 @@ def main():
 def simulate(argv):
     """模拟事件注入：不连飞书，直接喂处理函数（回归自测主力）。
 
-      --sim "文本"                 以白名单身份发一条文本
-      --sim-as <openid> "文本"     指定发信人（测白名单拒绝）
+      --sim "文本"                     以白名单身份发一条文本
+      --sim-as <openid> "文本"         指定发信人（测白名单拒绝）
+      --sim-img <图路径> "文本"        先把本地图塞进队列再发文本（测意图⑥多模态链）
     """
     if argv[0] == "--sim-as":
         open_id, texts = argv[1], argv[2:]
+    elif argv[0] == "--sim-img":
+        open_id = next(iter(WHITELIST)) if WHITELIST else "NO_WHITELIST"
+        img_add(argv[1])
+        texts = argv[2:]
     else:
         open_id, texts = (next(iter(WHITELIST)) if WHITELIST else "NO_WHITELIST"), argv[1:]
     rep = CollectReplier()

@@ -224,7 +224,13 @@ _WALL_PROMPT = """你是「课后反馈单」结构化生成器。你的唯一�
 1. 只输出 JSON，不要解释、不要 markdown 代码块、不要前后缀。
 2. 家长可见：绝不出现内部词——层 / ★ / 基础过关 / 强化 / 拓展 / 素材 / 挑题 / 薄弱。
 3. 只写材料里真实出现的内容，缺信息就少写一行，绝不编造。
-4. 行数 3~8 行。"""
+4. 行数 3~8 行。
+
+🔴 工具与产出的关系（务必看清，别搞反）：
+- 「只输出 JSON」约束的是你的**最终回答**，**不**约束中间的工具调用。
+- 任务里若给了图片路径，你**必须**先用 Read 工具把每一张逐张读完再动笔——
+  这一步是允许的、必需的；跳过它直接交空 rows 是错误行为。
+- 读完之后，最终回答只留那一个 JSON 对象。"""
 
 _MASTERY_OK = ("熟练", "基本掌握", "待巩固")
 _BANNED = ("层", "★", "基础过关", "强化", "拓展", "素材", "挑题", "薄弱")
@@ -298,6 +304,11 @@ def _run_claude(prompt, image_paths=None, timeout=None):
         log("claude CLI rc=%s err=%s" % (p.returncode, (p.stderr or "")[:200]))
     try:
         ev = json.loads(p.stdout or "{}")
+        # 可观测：turns=1 且带图 = 模型没读图直接交卷（踩过一次，日志里要能一眼看出）
+        log("claude 完成 model=%s turns=%s dur=%ss cost=$%s"
+            % (",".join(sorted((ev.get("modelUsage") or {}).keys())) or "?",
+               ev.get("num_turns"), round((ev.get("duration_ms") or 0) / 1000.0, 1),
+               ev.get("total_cost_usd")))
         return str(ev.get("result") or "")
     except Exception:
         return p.stdout or ""

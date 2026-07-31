@@ -55,6 +55,41 @@ def register(mcp, client: RuoyiClient) -> None:
         return {"ok": True, "book_id": str(resp.get("id")) if isinstance(resp, dict) else None}
 
     @mcp.tool(tags={"shelf"})
+    async def save_book_recipe(book_id: str, recipe: dict) -> dict:
+        """给书挂**生产配方溯源**（资料工厂 ↔ 线上书绑定，零 DDL 落 style_meta_json.recipe）。
+
+        书是产物，recipe 记它**怎么造出来的**——下次要续造同类册子（下一期打卡、换年级、
+        加天数），从线上书就能找回源头脚本，不必翻记忆或猜目录。造完一册就顺手挂上。
+
+        约定键（软约定，结构不强校验，各产线形态差异大）：
+          factory   主题/版式（如 'punch-v1'）
+          engine    题目从哪来：'local-dsl'（自写表达式树）/ 'oralcalc-api'（出题器）/ 'manual'
+          sourceDir 生产脚本目录（工作区相对路径）
+          scripts   {角色: 文件名+一句话职责}
+          rebuild   重跑命令（照抄能再造一册）
+          seed      随机种子规则（可复现的关键）
+          scale     {days, perDay, total}
+          modules   模块组成与题量
+          syllabus  教材进度红线（能出什么/不能出什么）
+          gates     过了哪些闸（验算/查重/学段红线…）
+          pdf       成品 PDF 落点
+          builtAt / next  产出日期 / 续造要改哪几个参数
+        🔴 只存**指针**不存正文（JSON ≤ 8000 字符），题库正文留在脚本里。
+        只覆盖 recipe 键，netdisks/promo/accent 等其余键原样保留。
+        参数 book_id 字符串传；recipe 传 {} = 清空。返回 {ok, book_id, recipe}。
+        """
+        if not client.has_session():
+            return {"ok": False, "reason": "需先 login"}
+        if not str(book_id).strip():
+            return {"ok": False, "reason": "book_id 不能为空"}
+        try:
+            resp = await client.teacher_post(f"{BASE}/book/{book_id}/recipe", recipe or {})
+        except RuoyiError as e:
+            return {"ok": False, "reason": f"挂配方失败: {e}"}
+        return {"ok": True, "book_id": str(book_id),
+                "recipe": (resp or {}).get("recipe") if isinstance(resp, dict) else None}
+
+    @mcp.tool(tags={"shelf"})
     async def set_book_public(book_id: str, public: bool = True) -> dict:
         """把书置为公开 / 取消公开（is_public 1/0）。🔴 **仅超级管理员可调**，老师调用 BE 返 403。
 
