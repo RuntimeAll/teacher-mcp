@@ -55,6 +55,24 @@ def register(mcp, client: RuoyiClient) -> None:
         return {"ok": True, "book_id": str(resp.get("id")) if isinstance(resp, dict) else None}
 
     @mcp.tool(tags={"shelf"})
+    async def set_book_public(book_id: str, public: bool = True) -> dict:
+        """把书置为公开 / 取消公开（is_public 1/0）。🔴 **仅超级管理员可调**，老师调用 BE 返 403。
+
+        「建书 ≠ 公开」：createBook 一律建成私有，公开是审定后的独立动作（与题目 set-public 同口径）。
+        公开后该书对全体登录用户可读（书架列表 + 阅读页 + 导出），打卡书/电子课本上架前必走这一步。
+        参数 book_id 字符串传（雪花号）。返回 {ok, book_id, public}。
+        """
+        if not client.has_session():
+            return {"ok": False, "reason": "需先 login"}
+        if not str(book_id).strip():
+            return {"ok": False, "reason": "book_id 不能为空"}
+        try:
+            await client.teacher_put(f"{BASE}/book/{book_id}", {"isPublic": 1 if public else 0})
+        except RuoyiError as e:
+            return {"ok": False, "reason": f"置公开失败（非超管账号会 403）: {e}"}
+        return {"ok": True, "book_id": str(book_id), "public": bool(public)}
+
+    @mcp.tool(tags={"shelf"})
     async def list_books(book_type: str = "", subject_id: str = "", status: str = "") -> dict:
         """我的书列表（owner 归属自动过滤 + type/subject/status 可选筛选）。
 
