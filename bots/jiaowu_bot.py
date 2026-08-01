@@ -12,12 +12,16 @@
   **执行层**一个字没松——动作集固定、写库前必预览、必须「确认」才落库、
   10 分钟过期、重复确认幂等。LLM 只产结构化意图和文案，永远不直接碰数据。
 - 动作集之外一律说「我不会」（不硬猜一个最像的去做），理解层跑不通就诚实降级。
+- 🔴 2026-08-01 止血：**事件处理一律异步**。on_message 只解析 + 去重 + 起线程就返回，
+  处理链跑在后台 daemon 线程里（详见「事件闸」一节）。同步处理 = 飞书拿不到 ACK
+  = 同一条事件被无限重投，每趟真金白银。--sim 走 handle_text 仍是同步（回归要拿输出）。
 
 跑法：
   python3 jiaowu_bot.py            # 常驻（systemd jiaowu-bot.service）
   python3 jiaowu_bot.py --sim "帮我查下待结算"   # 模拟事件注入（回归自测，不连飞书）
 """
 
+import collections
 import datetime
 import io
 import json
@@ -38,6 +42,8 @@ MCP_ENV_PATH = os.environ.get("TEACHER_MCP_ENV", "/opt/teacher-mcp/.env")
 IMG_DIR = os.environ.get("BOT_IMG_DIR", "/opt/jiaowu-push/img")
 CONFIRM_TTL = int(os.environ.get("CONFIRM_TTL", "600"))    # 确认态 10 分钟（D2）
 IMG_TTL = int(os.environ.get("IMG_TTL", "1800"))           # 图队列僵尸 30 分钟自清
+SEEN_MAX = int(os.environ.get("SEEN_MAX", "500"))          # 已处理 message_id 记忆条数上限
+SEEN_TTL = int(os.environ.get("SEEN_TTL", "1800"))         # 已处理 message_id 记忆时效（秒）
 
 # 🔴 0 秒回执（老 bot PRD-007 停役前的体验遗产）+ 路由透明化（2026-08-01 换脑后加的）：
 #    ① 理解层本身要跑一次 headless CLI（数秒），静默期必须先顶一句，否则又是"发完干等"。
@@ -74,6 +80,12 @@ _choice = None       # 待消歧：{'kind','items','text','pre','ts'}
 #    等下一条文本来了再由理解层决定谁来消费它；被某个动作消费掉就清空。
 _images = []         # [{'path','ts'}]
 _turn = None         # 本轮理解层结果 {'intent','slots'}，供 _ask_choice 原样带走免二次理解
+
+# 🔴 事件去重表（2026-08-01 止血）：message_id → 首见时间戳。
+#    _seen_lock 是**独立**的小锁，绝不能用 _lock——_lock 会被后台线程占住几分钟，
+#    去重判定要在毫秒内做完（它在 ACK 主路径上）。
+_seen = collections.OrderedDict()
+_seen_lock = threading.Lock()
 
 
 def be():
@@ -719,8 +731,11 @@ def act_ingest_lesson_log(rep, slots, text, forced_student=None):
         return
     price = float(acc.get("lessonPrice") or 0)
 
-    rep.text("收到 ✓ 正在逐张看这 %d 张课时本…手写体我会读得慢一点，"
-             "读完逐条列给你核对，你点头我才落库。" % len(imgs))
+    # 🔴 这句必须在读图 pass **开始之前**发：读图动辄 1~3 分钟，中间一个字都没有，
+    #    老师会以为又挂了（然后重发一条 = 又一趟钱）。把耗时说死，他才肯等。
+    rep.text("收到 ✓ 正在逐行读这 %d 张课时本，手写体要看仔细，大概 1~3 分钟。"
+             "读完我把逐条清单发你核对，你点头我才落库——这段时间不用重发，我在读。"
+             % len(imgs))
     r = B.read_lesson_log(imgs, today(), st["name"])
     if not r.get("ok"):
         rep.text("这几张图我没读出来（读图模块没跑通），没有落任何库。"
@@ -979,6 +994,77 @@ def resolve_choice(text, rep):
         dispatch(orig, rep, forced_session=picked, pre=pre)
 
 
+# ──────────────────── 事件闸：去重 + 异步（2026-08-01 止血） ────────────────────
+#
+# 🔴 事故复盘（2026-08-01 13:15~13:21，/opt/jiaowu-push/bot.log 实证）：
+#    同一条消息被处理了三次，每趟 90~190 秒、每趟真金白银烧 claude CLI。
+#    根因 = on_message 是同步的：飞书长连接靠 handler 返回来判投递成功，
+#    而 ⑧ 看图补录的读图 pass 要跑 87~188 秒 → 飞书等不到 ACK 判失败 → 重投同一条
+#    → 重投又是一趟 188 秒 → 永远追不上，死循环。旧代码的 _lock 还让重投排队串行，
+#    越堆越糟。
+#
+# 两道闸（缺一不可）：
+#    ① 异步化（根治）：on_message 只解析 + 去重 + 起线程，毫秒级返回 → ACK 及时。
+#    ② 去重（兜底）：飞书是 at-least-once 语义，ACK 再快也可能因网络抖动重投；
+#       见过的 message_id 一律丢弃。
+
+
+def seen_message(message_id):
+    """True = 这条 message_id 之前见过（飞书重投）→ 调用方直接丢弃。
+
+    🔴 首见即登记，登记发生在**处理之前**：重投常常在上一趟还没跑完时就到了，
+       等处理完再登记等于没去重。
+    表有双重上限：SEEN_TTL 秒过期 + 最多 SEEN_MAX 条（OrderedDict 按插入序淘汰队头）。
+    """
+    if not message_id:
+        return False
+    now = time.time()
+    with _seen_lock:
+        for k, ts in list(_seen.items()):      # 插入序 → 队头最旧，遇到没过期的即可停
+            if now - ts > SEEN_TTL:
+                _seen.pop(k, None)
+            else:
+                break
+        if message_id in _seen:
+            return True
+        _seen[message_id] = now
+        while len(_seen) > SEEN_MAX:
+            _seen.popitem(last=False)
+        return False
+
+
+def _bg_run(work, rep, tag):
+    """把一条消息的完整处理链丢后台线程。
+
+    🔴 线程里的异常必须被吃掉并落 log + 尽力回一句给老师——后台线程静默死掉
+       比报错更糟（他会一直等一个永远不来的回复）。
+    """
+    def _runner():
+        try:
+            work()
+        except Exception as e:  # noqa: BLE001
+            log("[后台线程异常] tag=%s %r" % (tag, e))
+            try:
+                rep.text("出错了：%r\n（没有落库，可以修正后重发指令。）" % e)
+            except Exception as e2:  # noqa: BLE001
+                log("[后台异常回复也失败] %r" % e2)
+    t = threading.Thread(target=_runner, name="jiaowu-%s" % tag, daemon=True)
+    t.start()
+    return t
+
+
+def handle_event(message_id, work, rep, tag="msg"):
+    """事件总入口：去重 → 起后台线程 → **立刻返回**（让 SDK 拿到 ACK）。
+
+    这个函数自身必须是毫秒级的：它里面一个字节的网络 IO 都不能有。
+    返回 Thread（重投被丢弃时返回 None），仅供回归断言用。
+    """
+    if seen_message(message_id):
+        log("[重投丢弃] message_id=%s" % message_id)
+        return None
+    return _bg_run(work, rep, tag)
+
+
 # ───────────────────────────── 消息处理 ─────────────────────────────
 
 
@@ -1022,7 +1108,10 @@ def handle_image(open_id, data, message_id, rep):
         log("[存图失败] %r" % e)
         rep.text("图片存盘出错，稍后重发一次。")
         return "error"
-    n = img_add(path)
+    # 🔴 异步化之后收图也要抢 _lock：不然一条正在跑读图 pass 的文本（几分钟）
+    #    会被半路插进队列的新图搅浑（act_* 开头才取 img_paths()）。
+    with _lock:
+        n = img_add(path)
     log("[收图] n=%d -> %s" % (n, path))
     # 🔴 收图不做任何思考：不调 LLM、不猜图型、不预设用途（上一版一律当作业照片，
     #    老师发的手写课时本被回了句"发完说「生成反馈」"，图从头到尾没人看）。
@@ -1065,6 +1154,11 @@ def main():
         return raw.content if raw is not None and getattr(raw, "content", None) else None
 
     def on_message(data):
+        """🔴 这个函数必须在毫秒内返回——它就是飞书那条 ACK。
+
+        真正的活（理解层几秒、读图 pass 90~190 秒）全部丢后台线程，见 handle_event。
+        这里只做：解析身份 → 去重 → 起线程。任何网络 IO（含取图）都在线程里。
+        """
         msg = data.event.message
         sender = getattr(data.event, "sender", None)
         sid = getattr(sender, "sender_id", None) if sender else None
@@ -1073,29 +1167,27 @@ def main():
         if not open_id:
             rep.text("识别不出你的飞书身份，不能操作。")
             return
-        try:
-            if msg.message_type == "image":
-                key = json.loads(msg.content).get("image_key", "")
+        mtype, mid, content = msg.message_type, msg.message_id, msg.content
+
+        def work():
+            if mtype == "image":
+                key = json.loads(content).get("image_key", "")
                 if open_id not in WHITELIST:      # 非白名单不下载、不落盘
-                    handle_image(open_id, b"", msg.message_id, rep)
+                    handle_image(open_id, b"", mid, rep)
                     return
-                data_bytes = _download_img(msg.message_id, key) if key else None
+                data_bytes = _download_img(mid, key) if key else None
                 if not data_bytes:
                     rep.text("这张图没取到，麻烦重发一次。")
                     return
-                handle_image(open_id, data_bytes, msg.message_id, rep)
-            elif msg.message_type == "text":
-                txt = json.loads(msg.content).get("text", "").replace("@_user_1", "").strip()
+                handle_image(open_id, data_bytes, mid, rep)
+            elif mtype == "text":
+                txt = json.loads(content).get("text", "").replace("@_user_1", "").strip()
                 handle_text(open_id, txt, rep)
             else:
                 if open_id in WHITELIST:
                     rep.text("我只认文字和图片。\n\n%s" % I.CAPABILITY_LIST)
-        except Exception as e:  # noqa: BLE001
-            log("[handler 异常] %r" % e)
-            try:
-                rep.text("出错了：%r" % e)
-            except Exception:  # noqa: BLE001
-                pass
+
+        handle_event(mid, work, rep, tag=mtype or "msg")
 
     handler = (lark.EventDispatcherHandler.builder("", "")
                .register_p2_im_message_receive_v1(on_message).build())
