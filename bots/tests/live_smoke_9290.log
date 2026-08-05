@@ -1,0 +1,96 @@
+PRD-018 批4 · 机器人真机终验（bots/executor.py Be 层 → http://localhost:9290）
+时间：2026-08-05 16:46:52 ｜ 今天=2026-08-05 昨天=2026-08-04 前天=2026-08-03
+凭据来源：D:\workplace\ai-bkb\codeplace-O\teacher-mcp\.env（用户=admin，client_id=e5cd7e48…）
+admin token 注入完成（Be.token 已覆写，绝不回落 botLogin）
+
+========================================================================
+=== ① 开户：Be.upsert_account → 时薪 233.3333 元/小时 · 每节 1.5 小时
+========================================================================
+    建学生 PRD018BOT俊羽 → id=213
+    upsert_account 返回：{"id": "2084924087418814466"}
+  [PASS] 1-a upsert_account 返回 accountId  accountId=2084924087418814466
+  [PASS] 1-b 账本 price_per_hour = 233.3333（4 位小数没被吃掉）  实测 233.3333
+  [PASS] 1-c 该生数学绑定唯一且指向本账本  link=((2084924087418814466, Decimal('1.50')),)
+  [PASS] 1-d 绑定 hours_per_lesson = 1.5  实测 1.50
+
+========================================================================
+=== ② 三档充值各一笔：20 节 / 3 小时 / 700 元（其中「3 小时」那笔补录到 2026-04-12）
+========================================================================
+    落库流水（按 id 序）：
+      flow_type=1 hours_delta=30.00 amount_paid=None occur_date=2026-08-05 note=PRD018BOT 按节充值
+      flow_type=1 hours_delta=3.00 amount_paid=None occur_date=2026-04-12 note=PRD018BOT 按小时补录
+      flow_type=1 hours_delta=3.00 amount_paid=700.00 occur_date=2026-08-05 note=PRD018BOT 按金额充值
+  [PASS] 2-0 三笔充值全部落库  实测 3 行
+    换算口径复核：20 节 × 1.5 h/节 = 30 h ｜ 3 h 原样 ｜ 700 ÷ 233.3333 = 3.000000 → scale2
+  [PASS] 2-a 按节：hours_delta = 20 × 1.5 = 30.00  实测 30.00
+  [PASS] 2-b 按小时：hours_delta = 3.00（原样）  实测 3.00
+  [PASS] 2-c 按金额：hours_delta = 700 ÷ 233.3333 = 3.00  实测 3.00
+  [PASS] 2-d 按金额那笔 amount_paid = 700.00（入参原样）  实测 700.00
+  [PASS] 2-e 按节那笔 amount_paid 为空（BE 不替它派生金额）  实测 None
+  [PASS] 2-f 按小时那笔 amount_paid 为空  实测 None
+  [PASS] 2-g 补录那笔 occur_date = 2026-04-12（历史日期回填生效）  实测 2026-04-12
+  [PASS] 2-h 未传 occurDate 的两笔 occur_date = 今天 2026-08-05  实测 2026-08-05 / 2026-08-05
+  [PASS] 2-i 账本 hours_remain = 30 + 3 + 3 = 36.00  实测 36.00
+
+========================================================================
+=== ③ 台账与余额话术：Be.ledger + bal_text / _bal_line
+========================================================================
+    台账 3 行（按业务日期正序）：
+      2026-04-12 type=1 hours=3.0 剩余=3.0 content='PRD018BOT 按小时补录'
+      2026-08-05 type=1 hours=30.0 剩余=33.0 content='PRD018BOT 按节充值'
+      2026-08-05 type=1 hours=3.0 剩余=36.0 content='PRD018BOT 按金额充值'
+  [PASS] 3-a 台账 3 行（三笔充值）  实测 3
+  [PASS] 3-b 首行 = 补录的历史日期 2026-04-12（台账按业务日期排序，不按录入序）  实测 2026-04-12
+  [PASS] 3-c 台账末行剩余 = 36.00  实测 36.0
+  [PASS] 3-d Be.roster + account_of 能取到该生数学账户 VO  keys=['accountId', 'amountRemain', 'hoursPerLesson', 'hoursRemain', 'id', 'lessonPrice', 'lessonsRemain', 'name', 'note', 'pricePerHour', 'shared', 'status', 'studentId', 'subject', 'subjectLabel']
+    账户 VO：hoursRemain=36.0 lessonsRemain=24.0 hoursPerLesson=1.5 shared=False bindingCount=None
+  [PASS] 3-e is_shared = False（单绑本）  实测 False
+    bal_text  → '36 小时（≈24 节）'
+    _bal_line → '📊 当前余额：36 小时（≈24 节）'
+  [PASS] 3-f 话术含「小时」（小时为底账单位）  实测 '36 小时（≈24 节）'
+  [PASS] 3-g 单绑本带折节副显「≈N 节」  实测 '36 小时（≈24 节）'
+  [PASS] 3-h 话术 = 「36 小时（≈24 节）」（36 ÷ 1.5 = 24）  实测 '36 小时（≈24 节）'
+  [PASS] 3-i _bal_line = 📊 前缀 + bal_text  实测 '📊 当前余额：36 小时（≈24 节）'
+  [PASS] 3-j 话术数值 == DB hours_remain == 台账末行剩余  VO=36.0 台账末行=36.0
+
+========================================================================
+=== ④ 待办：Be.session_batch 排两场（时长 1.5h / 2h）→ Be.pending 的 plannedHours 都应 = 1.5
+========================================================================
+    session_batch created=2 conflicts=[]
+  [PASS] 4-a 两场都建出来了  实测 2
+    昨天(09:00-10:30, 1.5h) session=625 ｜ 前天(09:00-11:00, 2h) session=626
+    待结算清单共 35 条，本次命中 2 条：
+      session=626 date=2026-08-03 09:00-11:00 plannedHours=1.5 hoursPerLesson=1.5 plannedAmount=350.0 content=None sessionStatus=0
+      session=625 date=2026-08-04 09:00-10:30 plannedHours=1.5 hoursPerLesson=1.5 plannedAmount=350.0 content=None sessionStatus=0
+  [PASS] 4-b 两场都在 pending 清单里  命中 2
+  [PASS] 4-c 1.5h 场次 plannedHours = 1.5  实测 1.5
+  [PASS] 4-d 🔴 2h 场次 plannedHours 仍 = 1.5（吃每节时长，不是场次起止时长——排除巧合）  实测 1.5
+  [PASS] 4-e plannedAmount = 1.5 × 233.3333 = 350.00  实测 350.0
+  [PASS] 4-f 批4 新增 content 字段存在且此刻为空（结算前没写过）  实测 None
+
+========================================================================
+=== ⑤ 结算：Be.settle 不传 hours（吃 plannedHours 默认）+ 顺手写「这节讲了什么」
+========================================================================
+    settle 返回：{"settled": 1, "feedbackSheetIds": [], "skipped": []}
+  [PASS] 5-a settled >= 1  settled=1 skipped=[]
+  [PASS] 5-b 场次 session_status='1'（已上）  实测 1
+  [PASS] 5-c 场次 settle_status='1'（已结）  实测 1
+  [PASS] 5-d 场次 content 已写入  实测 'PRD018BOT 真机结算'
+    扣课流水：(('2', Decimal('-1.50'), Decimal('-350.00'), datetime.date(2026, 8, 4)),)
+  [PASS] 5-e 新增 1 条扣课流水（flow_type='2'）  实测 (('2', Decimal('-1.50'), Decimal('-350.00'), datetime.date(2026, 8, 4)),)
+  [PASS] 5-f 扣课 hours_delta = -1.50（= plannedHours，非场次时长）  实测 -1.50
+  [PASS] 5-g 扣课 occur_date = 场次日期 2026-08-04  实测 2026-08-04
+  [PASS] 5-h 扣课 amount_paid = -(1.5 × 233.3333) = -350.00  实测 -350.00
+  [PASS] 5-i 账户余额 36.0 → 34.5（正好减 1.5）  实测 34.5
+  [PASS] 5-j 已结场次退出待结算清单
+    结算后 bal_text → '34.5 小时（≈23 节）'
+  [PASS] 5-k 结算后话术 = 「34.5 小时（≈23 节）」（34.5 ÷ 1.5 = 23）  实测 '34.5 小时（≈23 节）'
+
+========================================================================
+=== 清零：删掉本次 PRD018BOT 建的全部数据并复核残留
+========================================================================
+  残留复核（都应为 0）：学生(name LIKE PRD018BOT%)=0 ｜ 账本=0 ｜ 绑定link=0 ｜ 流水=0 ｜ 场次=0 ｜ 场次(按学生)=0
+  [PASS] Z-a 测试数据清零  {'学生(name LIKE PRD018BOT%)': 0, '账本': 0, '绑定link': 0, '流水': 0, '场次': 0, '场次(按学生)': 0}
+
+========================================================================
+结论：PASS —— 五步真机链路（开户 / 三档充值 / 台账话术 / 待办 plannedHours / 结算）全绿
