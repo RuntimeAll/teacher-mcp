@@ -256,7 +256,7 @@ def recent_lecture_frags(uid, since_dt, limit=50):
 
 _DEL_BLOCKERS = [
     ("biz_paper_question", "question_id", "试卷"),
-    ("biz_exam_paper_item", "question_id", "导入卷"),
+    # biz_exam_paper_item（导入卷）2026-08-05 数据库清理批2 删表，随删剔除
     ("biz_shelf_item", "question_id", "书架书"),
     ("biz_book_question", "question_id", "教辅书"),
     ("biz_solution_model", "mother_question_id", "解题模型母题"),
@@ -265,7 +265,7 @@ _DEL_CASCADES = [
     "biz_question_ai", "biz_question_block", "biz_question_free_tag", "biz_question_image",
     "biz_question_knowledge", "biz_question_model", "biz_question_note", "biz_question_pattern_rel",
     "biz_question_pitfall", "biz_question_basket", "biz_question_favorite", "biz_review_issue",
-    "biz_anchor_worklist", "biz_text_content",
+    "biz_text_content",  # biz_anchor_worklist 2026-08-05 批2 删表，随删剔除
 ]
 
 
