@@ -349,15 +349,15 @@ def _after_line(acc, delta_h):
 
 
 def _price_line(acc):
-    """账户计价口径一行：时薪 + 每节时长（+ 按节报价，方便他对着口头价核）。"""
-    pph = acc.get("pricePerHour")
-    if pph is None:                     # 老镜像兜底：只有元/节时反推
-        return "单价：%s 元/节" % money(acc.get("lessonPrice"))
+    """账户计价口径一行。🔴 D11：对外只有「课时」概念——只说「每节 X 小时 · Y 元/节」，
+    绝不吐「时薪/元/小时」（pricePerHour 是内部计价参数，不外显）。"""
     hpl = acc.get("hoursPerLesson")
-    s = "时薪 %s 元/小时" % money(pph)
+    per_lesson = acc.get("lessonPrice")
+    if per_lesson is None and acc.get("pricePerHour") is not None and hpl:
+        per_lesson = round(float(acc["pricePerHour"]) * float(hpl), 2)
     if hpl:
-        s += " · 每节 %s 小时（按节报价 %s 元/节）" % (money(hpl), money(acc.get("lessonPrice")))
-    return s
+        return "每节 %s 小时 · %s 元/节" % (money(hpl), money(per_lesson))
+    return "单价：%s 元/节" % money(per_lesson)
 
 
 # ───────────────────────────── 六意图 ─────────────────────────────
@@ -550,14 +550,18 @@ def act_account(rep, intent, slots, text, forced_student=None):
             return
         pv = ["【待确认 · %s】" % ("改计价口径" if acc else "开户"),
               "学生：%s" % st["name"], "学科：%s" % subject,
-              "计价：时薪 %s 元/小时 · 每节 %s 小时（按节报价 %s 元/节）"
-              % (money(pph), money(hpl), money(round(pph * hpl, 2)))]
-        if not hourly and slots.get("price"):
-            pv.append("（你说的 %s 是**每节**的钱，除以每节 %s 小时得时薪；"
-                      "要按小时报价就说「时薪 xxx」）" % (money(slots["price"]), money(hpl)))
+              "计价：每节 %s 小时 · %s 元/节"
+              % (money(hpl), money(round(pph * hpl, 2)))]
+        if hourly and slots.get("price"):
+            # 老师明说按小时报价才需要点破换算（D11：我们嘴里不主动出「时薪」）
+            pv.append("（你按小时报的 %s，折成每节 %s 小时 = %s 元/节）"
+                      % (money(slots["price"]), money(hpl), money(round(pph * hpl, 2))))
         if acc:
-            pv.append("原：时薪 %s 元/小时 · 每节 %s 小时"
-                      % (money(acc.get("pricePerHour")), money(acc.get("hoursPerLesson"))))
+            old_hpl = acc.get("hoursPerLesson")
+            old_per_lesson = acc.get("lessonPrice")
+            if old_per_lesson is None and acc.get("pricePerHour") is not None and old_hpl:
+                old_per_lesson = round(float(acc["pricePerHour"]) * float(old_hpl), 2)
+            pv.append("原：每节 %s 小时 · %s 元/节" % (money(old_hpl), money(old_per_lesson)))
         tier, hint = _tier_args(acc or {}, hours, lessons, amount)
         if any(tier.values()):
             pv.append("顺手充值：%s" % X.flow_brief(tier))

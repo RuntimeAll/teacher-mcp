@@ -474,8 +474,9 @@ def _op_account_open(be, a):
     r = be.upsert_account(a["studentId"], a["subject"], a["price"],
                           a.get("hoursPerLesson") or 1.0, a.get("note"))
     acc_id = (r or {}).get("id")
-    lines = ["✅ %s · %s 账本已就绪（时薪 %s 元/小时 · 每节 %s 小时）"
-             % (a["studentName"], a["subject"], money(a["price"]), money(a.get("hoursPerLesson") or 1.0))]
+    hpl_v = a.get("hoursPerLesson") or 1.0
+    lines = ["✅ %s · %s 账本已就绪（每节 %s 小时 · %s 元/节）"
+             % (a["studentName"], a["subject"], money(hpl_v), money(round(float(a["price"]) * float(hpl_v), 2)))]
     if a.get("hours") or a.get("amount") or a.get("lessons"):
         be.add_flow(acc_id, "1", hours=a.get("hours") or 0, amount=a.get("amount") or 0,
                     lessons=a.get("lessons") or 0, occur_date=a.get("occurDate"),
