@@ -701,7 +701,7 @@ def _op_ingest_lesson_log(be, a):
     img = None
     try:
         img = (be.export_ledger_png(a["accountId"]) or {}).get("url")
-        lines.append("🖼 课时流水单已生成，随后发出，请对着课时本核一遍。")
+        lines.append("🖼 课时流水单已生成（默认=本次充值以来的记录；要更早的去 H5 账单页按时间范围导），随后发出，请对着课时本核一遍。")
     except BeError as e:
         lines.append("⚠️ 流水单出图失败（数据已落库）：%s" % e)
     lines.append("👉 %s" % h5("account"))
