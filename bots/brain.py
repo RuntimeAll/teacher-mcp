@@ -72,7 +72,7 @@ ROUTER_SYSTEM = u"""你是「教务速办机器人」的意图理解器。一位
 {"intent":"...","slots":{...},"clarify":null}
 
 【intent】只能是下面这 15 个之一，多一个字、少一个字都算错：
-  account_open       开户 / 改单价。例：给俊羽开个数学户 350 一节 / 把俊羽单价改成 400
+  account_open       开户 / 改时薪或每节时长。例：给俊羽开个数学户 350 一节（1.5 小时）/ 把俊羽时薪改成 260
   account_recharge   充值。例：俊羽充 20 节 / 他交了 7000 块
   account_adjust     调整增减（非充值的手工加减）。例：俊羽调整 -1 节 备注 补扣 / 上次多扣了一节退回来
   settle_pending     查待结算清单（只读）。例：有几场待结算 / 待办
@@ -80,10 +80,10 @@ ROUTER_SYSTEM = u"""你是「教务速办机器人」的意图理解器。一位
   leave              请假冲正。例：俊羽 7月26 请假 / 那节课取消了
   feedback_text      老师口述本节要点 → 写课后反馈单
   feedback_image     看学生作业/板书照片 → 写课后反馈单（老师手上要有图）
-  ledger             查台账 / 流水 / 余额（只读）。例：俊羽还剩多少课时 / 俊羽台账
+  ledger             查台账 / 流水 / 余额（只读）。例：俊羽还剩多少课时 / 还剩几节 / 俊羽台账
   family_ledger      家庭合并余额（只读，写死好好+俊羽一家）。例：他们家还剩多少
   family_recharge    家庭充值。例：他们家充 7000
-  family_rebalance   家庭归账对倒。例：归账 / 把好好户的负数平掉
+  family_rebalance   （已退役，仍收：两户已并一本共享账）例：归账 / 把好好户的负数平掉
   ingest_lesson_log  看**手写课时本 / 纸质上课记录**照片，把历史上课记录补录进系统
                      （建历史场次 + 逐场扣课时 + 补充值笔）。例：
                        · 这是我上课的课时记录，帮我把 4 月 9 号到 6 月 28 号的录进去
@@ -106,9 +106,13 @@ ROUTER_SYSTEM = u"""你是「教务速办机器人」的意图理解器。一位
   date       YYYY-MM-DD。相对日期（今天/昨天/上周五）你按下面给的「今天」自己换算好
   dateFrom   YYYY-MM-DD，一段范围的起点（补录场景常见）
   dateTo     YYYY-MM-DD，一段范围的终点
-  hours      课时数，数字（该负就写负数）
-  amount     金额（元），数字
-  price      单价（元/节），数字
+  hours      小时数，数字（该负就写负数）。🔴 老师说「N 小时」才填这里
+  lessons    节数，数字。🔴 老师说「N 节」填这里，别自己折算成小时（系统按每节时长换算）
+  amount     金额（元），数字。老师说「交了 N 块」只填这里
+  price      时薪（元/小时），数字。🔴 老师说「350 一节」这类按节报价 = 每节的钱，
+             也照抄进 price 并把节的时长写进 hoursPerLesson（如果他说了），系统会换算
+  hoursPerLesson 每节时长（小时），数字。如「俊羽一节课 1.5 小时」= 1.5
+  occurDate  YYYY-MM-DD，充值/调整的业务日期（补录历史充值时=真实交钱日期）
   sessionId  场次号，纯数字字符串
   timeNote   实际上课时间，如 "13:30-15:00"
   note       备注 / 原因
@@ -129,8 +133,8 @@ LESSON_LOG_SYSTEM = u"""你是「手写课时本」识别器。老师拍了纸�
 你要把它逐行读成结构化 JSON，供系统补录历史场次和扣课时用。
 
 你的唯一输出 = 一个 JSON 对象。不要解释、不要 markdown 代码块、不要前后缀：
-{"records":[{"date":"2026-04-12","start":"13:30","end":"15:00","title":"数字迷、图形面积","hours":1}],
- "recharges":[{"date":"2026-04-12","hours":10,"note":"4.12 +10 节"}],
+{"records":[{"date":"2026-04-12","start":"13:30","end":"15:00","title":"数字迷、图形面积","lessons":1}],
+ "recharges":[{"date":"2026-04-12","lessons":10,"note":"4.12 +10 节"}],
  "notes":"哪几处看不清、你拿不准什么"}
 
 🔴 铁律一：这是**手写体，你不许猜**。任何一个字段看不清就填 null，
@@ -142,13 +146,16 @@ LESSON_LOG_SYSTEM = u"""你是「手写课时本」识别器。老师拍了纸�
 2. date 必须 YYYY-MM-DD。表上通常只写「4.12」这种「月.日」，
    年份按下面给你的「今天」推算（推出来的日期比今天还晚，就算上一年）。
 3. start / end = HH:mm 24 小时制，照抄表上的（如 13:30-15:00）。
-4. hours = 那一行扣的课时数（表上写「1 节」就是 1）；没写或看不清填 null。
+4. lessons = 那一行扣的**节数**（表上写「1 节」就是 1）；没写或看不清填 null。
+   🔴 单位照抄本子：本子写「节」就填 lessons，只有本子明写「小时」时才填 hours。
+   一节等于几小时不用你算（系统按这个学生的每节时长自己折）。
 5. title = 那一行「上课内容」列的原文，**照抄**，不要润色、不要替他补全成完整句子。
    个别字实在认不出，就把认得出的部分写上，别硬凑。
 6. recharges = 表格外面/旁边/箭头标注的**充值**笔，例如「4.12 +10 节」「6.28 +10 节」。
+   单位同样照抄：写「节」填 lessons，写「小时」填 hours，写「元/块」填 amount，三选一。
    充值和上课是两回事，绝对不要混进 records。
 7. 表上通常还有一列「剩余」（9、8、7…递减）。那是他自己的余额演算，
-   **不要**把它当成 hours，也不要输出它——但你可以拿它自检：
+   **不要**把它当成 lessons，也不要输出它——但你可以拿它自检：
    相邻两行剩余差 1，就说明那一行确实扣了 1 节。
 8. 图上没有的东西一律不许出现在输出里。
 
@@ -269,7 +276,13 @@ def _clean_slots(raw, roster, today):
         "date": _date(raw.get("date")),
         "dateFrom": _date(raw.get("dateFrom")),
         "dateTo": _date(raw.get("dateTo")),
+        # 🔴 PRD-018 三档 + 每节时长 + 业务日期：LLM 说了就得接得住。
+        #    漏接一个键 = 老师说的那句话在这里被静默丢掉（occurDate 尤其：
+        #    正则兜底根本不解析它，这里不接就永远传不到 executor）。
         "hours": _num(raw.get("hours")),
+        "lessons": _num(raw.get("lessons")),
+        "hoursPerLesson": _num(raw.get("hoursPerLesson")),
+        "occurDate": _date(raw.get("occurDate")),
         "amount": _num(raw.get("amount")),
         "price": _num(raw.get("price")),
         "sessionId": _sid(raw.get("sessionId")),
@@ -310,9 +323,8 @@ def roster_brief(roster, limit=40):
             continue
         bits = []
         for a in (st.get("accounts") or []):
-            bits.append("%s余%s节/%s元" % (a.get("subjectLabel") or "?",
-                                        X.money(a.get("hoursRemain")),
-                                        X.money(a.get("amountRemain"))))
+            # 🔴 PRD-018：hoursRemain 是**小时**，别再当「节」念（模型看这行学口径）
+            bits.append("%s余%s" % (a.get("subjectLabel") or "?", X.bal_text(a)))
         grade = st.get("grade") or ""
         lines.append("- %s%s%s" % (name, ("（%s）" % grade) if grade else "",
                                    ("｜" + "，".join(bits)) if bits else "｜未开户"))
@@ -373,8 +385,11 @@ def understand(text, roster, today, img_paths=None, has_pending=False):
 def read_lesson_log(img_paths, today, student_name=None):
     """手写课时本照片 → {'records':[...], 'recharges':[...], 'notes':str, 'ok':bool}。
 
-    records 每条 = {date, start, end, title, hours}；🔴 看不清的字段是 None，
-    调用方必须把「读不全的行」显式摊给老师看，不许自己补齐。
+    records 每条 = {date, start, end, title, lessons, hours}；recharges 每条 =
+    {date, lessons, hours, amount, note}。
+    🔴 PRD-018 单位纪律：`lessons`=节（本子上的口径），`hours`=小时（底账口径），
+    两者都原样带出，**折算交调用方按该学生每节时长做**，这里一个字都不算。
+    🔴 看不清的字段是 None，调用方必须把「读不全的行」显式摊给老师看，不许自己补齐。
     """
     imgs = list(img_paths or [])
     if not imgs:
@@ -401,6 +416,7 @@ def read_lesson_log(img_paths, today, student_name=None):
             "start": _time(r.get("start")),
             "end": _time(r.get("end")),
             "title": _text(r.get("title"), 80),
+            "lessons": _num(r.get("lessons")),
             "hours": _num(r.get("hours")),
         })
     recharges = []
@@ -408,11 +424,12 @@ def read_lesson_log(img_paths, today, student_name=None):
         if not isinstance(r, dict):
             continue
         h = _num(r.get("hours"))
+        ls = _num(r.get("lessons"))
         a = _num(r.get("amount"))
-        if h is None and a is None:
+        if h is None and ls is None and a is None:
             continue
-        recharges.append({"date": _date(r.get("date")), "hours": h, "amount": a,
-                          "note": _text(r.get("note"), 80)})
+        recharges.append({"date": _date(r.get("date")), "hours": h, "lessons": ls,
+                          "amount": a, "note": _text(r.get("note"), 80)})
     X.log("[brain] 课时本读出 records=%d recharges=%d" % (len(records), len(recharges)))
     return {"records": records, "recharges": recharges,
             "notes": _text(obj.get("notes"), 300) or "", "ok": True}

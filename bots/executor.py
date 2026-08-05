@@ -172,15 +172,26 @@ class Be(object):
 
     # ---- 写（只由确认闸放行后调用） ----
 
-    def upsert_account(self, student_id, subject_label, price, note=None):
+    def upsert_account(self, student_id, subject_label, price_per_hour, hours_per_lesson=1.0, note=None):
+        """PRD-018 v3：开户=建账本+绑定；price_per_hour=时薪(元/小时)，hours_per_lesson=每节时长(小时)。"""
         body = {"studentId": str(student_id), "subject": SUBJECT_CODE.get(subject_label, subject_label),
-                "lessonPrice": price}
+                "pricePerHour": price_per_hour, "hoursPerLesson": hours_per_lesson}
         if note:
             body["note"] = note
         return self.call("/teacher/schedule/account", body)
 
-    def add_flow(self, account_id, flow_type, hours_delta, amount_delta, note=None):
-        body = {"flowType": flow_type, "hoursDelta": hours_delta, "amountDelta": amount_delta}
+    def add_flow(self, account_id, flow_type, hours=0, amount=0, lessons=0, occur_date=None, note=None):
+        """PRD-018 三档任一（hours 小时 / lessons 节 / amount 元），BE 按账本时薪与每节时长互换算。
+        occur_date=业务日期（补录历史充值回填真实日期，缺省=今天）。"""
+        body = {"flowType": flow_type}
+        if hours:
+            body["hours"] = hours
+        if lessons:
+            body["lessons"] = lessons
+        if amount:
+            body["amount"] = amount
+        if occur_date:
+            body["occurDate"] = str(occur_date)
         if note:
             body["note"] = note
         return self.call("/teacher/schedule/account/%s/flow" % account_id, body)
@@ -418,31 +429,93 @@ def run_op(be, op, args):
     return fn(be, args)
 
 
-# ---- ① 开户 / 改单价（可带顺手充值） ----
+# ---- ① 开户 / 改时薪（可带顺手充值；PRD-018 v3=建账本+绑定） ----
+
+def is_shared(acc):
+    """这本账是不是**共享账本**（绑定学生>1，如俊羽+好好并本）。
+
+    🔴 字段名以 BE 实测为准（TuitionAccountService.accountVo/accountBookVo）：
+       学生视角 VO 给 `shared`(bool)，账本视角 VO 给 `bindingCount`。
+       曾经写的 `bindCount` 是**不存在的键**，共享判定会永远为假 → 共享本被折成节。
+    """
+    if not acc:
+        return False
+    if acc.get("shared") is not None:
+        return bool(acc.get("shared"))
+    return int(acc.get("bindingCount") or acc.get("bindCount") or 1) > 1
+
+
+def bal_text(acc):
+    """余额正文（双单位，PRD-018 D1 v2.1）：小时为底 + 折节；共享本只报小时。
+
+    折节优先用 BE 直接给的 `lessonsRemain`（同一处口径），拿不到才本地按每节时长折。
+    共享账本每人每节时长不同、基准不唯一 → 只报小时（D4 规则②）。
+    """
+    if not acc:
+        return "—"
+    h = acc.get("hoursRemain")
+    if not is_shared(acc):
+        lessons = acc.get("lessonsRemain")
+        if lessons is None and acc.get("hoursPerLesson"):
+            try:
+                lessons = float(h) / float(acc["hoursPerLesson"])
+            except Exception:
+                lessons = None
+        if lessons is not None:
+            return "%s 小时（≈%s 节）" % (money(h), money(lessons))
+    return "%s 小时" % money(h)
+
+
+def _bal_line(acc):
+    return ("📊 当前余额：" + bal_text(acc)) if acc else ""
+
 
 def _op_account_open(be, a):
-    r = be.upsert_account(a["studentId"], a["subject"], a["price"], a.get("note"))
+    r = be.upsert_account(a["studentId"], a["subject"], a["price"],
+                          a.get("hoursPerLesson") or 1.0, a.get("note"))
     acc_id = (r or {}).get("id")
-    lines = ["✅ %s · %s 账户已就绪（单价 %s 元/节）" % (a["studentName"], a["subject"], money(a["price"]))]
-    if a.get("hours") or a.get("amount"):
-        be.add_flow(acc_id, "1", a.get("hours") or 0, a.get("amount") or 0,
-                    a.get("note") or "机器人充值")
-        lines.append("✅ 已充值：课时 +%s，金额 +%s 元" % (money(a.get("hours") or 0), money(a.get("amount") or 0)))
+    lines = ["✅ %s · %s 账本已就绪（时薪 %s 元/小时 · 每节 %s 小时）"
+             % (a["studentName"], a["subject"], money(a["price"]), money(a.get("hoursPerLesson") or 1.0))]
+    if a.get("hours") or a.get("amount") or a.get("lessons"):
+        be.add_flow(acc_id, "1", hours=a.get("hours") or 0, amount=a.get("amount") or 0,
+                    lessons=a.get("lessons") or 0, occur_date=a.get("occurDate"),
+                    note=a.get("note") or "机器人充值")
+        lines.append("✅ 已充值（%s）" % _flow_brief(a))
     be.roster(force=True)
     for st in be.roster():
         if str(st.get("id")) == str(a["studentId"]):
             acc = be.account_of(st, a["subject"])
             if acc:
-                lines.append("📊 当前余额：%s 课时 / %s 元" % (money(acc.get("hoursRemain")), money(acc.get("amountRemain"))))
+                lines.append(_bal_line(acc))
     lines.append("👉 %s" % h5("account"))
     return {"text": "\n".join(lines), "image_path": None}
+
+
+def _flow_brief(a):
+    """充值/调整三档任一的回执片段：说老师给的那一档，别替 BE 算换算。
+
+    🔴 档位优先级与 BE 的 resolveHours 一致：hours → lessons → amount。
+    调整场景是负数，所以符号要跟着值走（不能无脑 "+"）。
+    """
+    for key, unit in (("hours", "小时"), ("lessons", "节"), ("amount", "元")):
+        v = a.get(key)
+        if v:
+            return "%s%s %s" % ("+" if float(v) >= 0 else "", money(v), unit)
+    return "+0 元"
+
+
+# 🔴 对外别名：jiaowu_bot 的预览段与本模块的回执段共用同一套档位话术，
+#    两处各写一份必漂移（预览说「+20 节」、回执说「+30 小时」这种）。
+flow_brief = _flow_brief
 
 
 # ---- ① 充值 / 调整 ----
 
 def _op_account_flow(be, a):
-    be.add_flow(a["accountId"], a["flowType"], a.get("hours") or 0, a.get("amount") or 0,
-                a.get("note") or ("机器人充值" if a["flowType"] == "1" else "机器人调整"))
+    be.add_flow(a["accountId"], a["flowType"], hours=a.get("hours") or 0,
+                amount=a.get("amount") or 0, lessons=a.get("lessons") or 0,
+                occur_date=a.get("occurDate"),
+                note=a.get("note") or ("机器人充值" if a["flowType"] == "1" else "机器人调整"))
     kind = "充值" if a["flowType"] == "1" else "调整"
     be.roster(force=True)
     bal = ""
@@ -450,12 +523,11 @@ def _op_account_flow(be, a):
         if str(st.get("id")) == str(a["studentId"]):
             acc = be.account_of(st, a.get("subject"))
             if acc:
-                bal = "\n📊 当前余额：%s 课时 / %s 元" % (money(acc.get("hoursRemain")), money(acc.get("amountRemain")))
-    return {"text": "✅ %s · %s 已%s：课时 %s%s，金额 %s%s 元%s\n👉 %s"
+                bal = "\n" + _bal_line(acc)
+    dt = ("（记账日期 %s）" % a["occurDate"]) if a.get("occurDate") else ""
+    return {"text": "✅ %s · %s 已%s：%s%s%s\n👉 %s"
                     % (a["studentName"], a.get("subject") or "", kind,
-                       "+" if (a.get("hours") or 0) >= 0 else "", money(a.get("hours") or 0),
-                       "+" if (a.get("amount") or 0) >= 0 else "", money(a.get("amount") or 0),
-                       bal, h5("account")),
+                       _flow_brief(a), dt, bal, h5("account")),
             "image_path": None}
 
 
@@ -473,9 +545,9 @@ def settle_lines(r, n_req, exp_hours=None, exp_amount=None):
     skipped = r.get("skipped") or []
     head = "✅ 已结算 %d 场" % ok
     if ok == n_req and exp_hours is not None:
-        head += "：共扣 %s 课时 / %s 元" % (money(exp_hours), money(exp_amount or 0))
+        head += "：共扣 %s 小时 / %s 元" % (money(exp_hours), money(exp_amount or 0))
     elif exp_hours is not None:
-        head += "（原计划 %d 场，预估共扣 %s 课时；实际以下方跳过清单为准）" % (n_req, money(exp_hours))
+        head += "（原计划 %d 场，预估共扣 %s 小时；实际以下方跳过清单为准）" % (n_req, money(exp_hours))
     lines = [head]
     if skipped:
         lines.append("⚠️ 跳过 %d 场：" % len(skipped))
@@ -498,7 +570,7 @@ def _op_leave(be, a):
     r = be.leave(a["sessionId"]) or {}
     h, amt = r.get("hours"), r.get("amount")
     if h or amt:
-        head = "✅ %s 已置请假，并冲正已扣：退回 %s 课时 / %s 元" % (a["desc"], money(h), money(amt))
+        head = "✅ %s 已置请假，并冲正已扣：退回 %s 小时 / %s 元" % (a["desc"], money(h), money(amt))
     else:
         head = "✅ %s 已置请假（该场未结算，无需冲正）" % a["desc"]
     tail = []
@@ -537,41 +609,12 @@ def _op_feedback(be, a):
     return {"text": "\n".join(lines), "image_path": img}
 
 
-# ---- ⑦ 家庭归账对倒（好好欠额 ← 俊羽钱包，一次确认打包两条调整） ----
+# ---- ⑦ 家庭归账对倒：PRD-018 v3 退役（学生绑账本 n:1，两户已并一本共享账，无「对倒」概念） ----
 
 def _op_family_rebalance(be, a):
-    """🔴 只倒金额列，课时列两边都不动（两人单价时长不同，课时跨户即失真）。
-
-    BE 契约允许 hoursDelta=0 而 amountDelta≠0（约束只是两者不能同时为 0），
-    所以金额单列对倒是干净可行的，不必拿课时凑数。
-    """
-    amt = float(a["amount"])
-    note = a.get("note") or "家庭归账"
-    # 先补欠方（把负数抹平，这是老师最想看到的那一列），再从钱包户扣。
-    be.add_flow(a["debtAccountId"], "4", 0, amt, note)
-    try:
-        be.add_flow(a["walletAccountId"], "4", 0, -amt, note)
-    except BeError as e:
-        # 半单：欠方已补、钱包未扣 → 家庭合计会虚高，必须喊出来并给回滚指令
-        raise BeError(
-            "⚠️ 归账只完成一半！%s 户已补 +%s 元，但 %s 户扣款失败（%s）。"
-            "家庭合计目前虚高 %s 元，请到 H5 给 %s 户手工补一笔 -%s 元调整。"
-            % (a["debtName"], money(amt), a["walletName"], e, money(amt),
-               a["walletName"], money(amt)))
-    be.roster(force=True)
-    lines = ["✅ 家庭归账完成：%s 元已从「%s（家庭钱包）」对倒给「%s」"
-             % (money(amt), a["walletName"], a["debtName"]),
-             "  · %s 户：+%s 元（欠额归零）" % (a["debtName"], money(amt)),
-             "  · %s 户：-%s 元" % (a["walletName"], money(amt)),
-             "（只倒金额，两边课时列均未改动）"]
-    tot = 0.0
-    for st in be.roster():
-        if str(st.get("id")) in a.get("memberIds", []):
-            for acc in (st.get("accounts") or []):
-                tot += float(acc.get("amountRemain") or 0)
-    lines.append("📊 家庭合计余额：%s 元（对倒不改变合计）" % money(tot))
-    lines.append("👉 %s" % h5("account"))
-    return {"text": "\n".join(lines), "image_path": None}
+    return {"text": "ℹ️ 两个孩子的课时已并成一本共享账（PRD-018），不存在两户对倒了。\n"
+                    "共享账本的余额与流水直接看台账：%s" % h5("account"),
+            "image_path": None}
 
 
 # ---- ⑧ 看图补录课时本（建场次 → 立刻逐场结算 → 充值笔，一个 op 里连续做完） ----
@@ -590,7 +633,8 @@ def _op_ingest_lesson_log(be, a):
        台账里 hoursAfter 中途为负是正常的（系统本来就允许欠费），最终值正确。
     """
     items = a["items"]                      # [{date,start,end,sessionType,subject,externalTitle,note}]
-    hours_by_key = a["hoursByKey"]          # {"YYYY-MM-DD HH:mm": 实扣课时}
+    hours_by_key = a["hoursByKey"]          # {"YYYY-MM-DD HH:mm": 实扣小时}
+    content_by_key = a.get("contentByKey") or {}   # {同上: 这节实际讲了什么}
     lines = []
 
     # ① 建场次
@@ -610,7 +654,11 @@ def _op_ingest_lesson_log(be, a):
         key = "%s %s" % (s.get("sessionDate"), str(s.get("startTime"))[:5])
         hrs = float(hours_by_key.get(key) or 1.0)
         exp_h += hrs
-        st_items.append({"sessionId": str(s.get("id")), "hours": hrs})
+        it = {"sessionId": str(s.get("id")), "hours": hrs}
+        # 🔴 PRD-018 D5/G7：结算顺手写 session.content，台账「内容」列就不再是清一色「正课」
+        if content_by_key.get(key):
+            it["content"] = content_by_key[key]
+        st_items.append(it)
     try:
         sr = be.settle(st_items, gen_feedback=False) or {}
     except BeError as e:
@@ -622,21 +670,22 @@ def _op_ingest_lesson_log(be, a):
     lines += settle_lines(sr, len(st_items), exp_h, a.get("expectAmount"))
     n_skip = len(sr.get("skipped") or [])
     if n_skip:
-        lines.append("⚠️ 上面跳过的场次已经建在系统里但没扣课时，正躺在「待结算」，"
+        lines.append("⚠️ 上面跳过的场次已经建在系统里但没扣课时（含未开户的：已标已上待补扣），正躺在「待结算」，"
                      "发「把待办清了」可以补结。")
 
-    # ③ 充值笔（🔴 biz_tuition_flow 没有业务日期列，充值行的台账日期 = 今天，
-    #    只能靠 note 把真实日期写进去；预览里已经跟老师明说过）
+    # ③ 充值笔（PRD-018：occur_date=业务日期列已就位，补录充值直接回填真实日期）
     ok_rc, bad_rc = 0, []
     for rc in (a.get("recharges") or []):
         try:
-            be.add_flow(a["accountId"], "1", rc.get("hours") or 0, rc.get("amount") or 0,
-                        rc.get("note") or "补录充值")
+            be.add_flow(a["accountId"], "1", hours=rc.get("hours") or 0,
+                        amount=rc.get("amount") or 0, lessons=rc.get("lessons") or 0,
+                        occur_date=rc.get("occurDate") or rc.get("date"),
+                        note=rc.get("note") or "补录充值")
             ok_rc += 1
         except BeError as e:
             bad_rc.append("%s（%s）" % (rc.get("note") or "充值", e))
     if ok_rc:
-        lines.append("✅ 已补 %d 笔充值（台账日期记为今天，真实日期写在备注里）" % ok_rc)
+        lines.append("✅ 已补 %d 笔充值（台账日期=真实业务日期）" % ok_rc)
     if bad_rc:
         lines.append("⚠️ 有 %d 笔充值没进去，请到 H5 手工补：%s\n   · %s"
                      % (len(bad_rc), h5("account"), "\n   · ".join(bad_rc)))
@@ -647,9 +696,7 @@ def _op_ingest_lesson_log(be, a):
         if str(st.get("id")) == str(a["studentId"]):
             acc = be.account_of(st, a.get("subject"))
             if acc:
-                lines.append("📊 %s 当前余额：%s 课时 / %s 元"
-                             % (a["studentName"], money(acc.get("hoursRemain")),
-                                money(acc.get("amountRemain"))))
+                lines.append("📊 %s 当前余额：%s" % (a["studentName"], bal_text(acc)))
     img = None
     try:
         img = (be.export_ledger_png(a["accountId"]) or {}).get("url")

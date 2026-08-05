@@ -58,8 +58,8 @@ _ACK = {
     "ledger":         "🧠 听成「查台账」，正在查…",
     "family_ledger":  "🧠 听成「查这一家的合并余额」，正在合两户…",
     "family_recharge": "🧠 听成「家庭充值」，正在算…",
-    "family_rebalance": "🧠 听成「家庭归账对倒」，正在算…",
-    "account_open":   "🧠 听成「开户/改单价」，正在准备…",
+    "family_rebalance": "🧠 听成「归账」——这事得跟你说一声…",
+    "account_open":   "🧠 听成「开户/改计价口径」，正在准备…",
     "account_recharge": "🧠 听成「充值」，正在算…",
     "account_adjust": "🧠 听成「账户调整」，正在准备…",
     "leave":          "🧠 听成「请假冲正」，正在查这节课…",
@@ -288,6 +288,78 @@ def pick_subject(slots, student):
     return student.get("subjectLabel") or "数学"
 
 
+# ─────────────── PRD-018 三档输入公共件（小时 / 节 / 金额，见 D9） ───────────────
+#
+# 🔴 总纪律：**老师说哪一档就传哪一档，机器人不替 BE 换算**。
+#    换算口径（节×每节时长、金额÷时薪）只有 BE 那一处，两边各算一次必漂移，
+#    而漂移出来的是钱。预览里出现的换算值一律只用于「让他看懂」，且都标「约」。
+
+
+def _tier_args(acc, hours, lessons, amount):
+    """三档原样值 → (args 片段, 预览补充说明|None)。
+
+    🔴 唯一的例外是**共享账本不吃「节」档**：BE 的 resolveHours 明确 400
+       （「共享账本每人每节时长不同，无法按节换算」）。俊羽+好好正是并成一本的那一对，
+       而「充 20 节」恰恰是老师最常说的一句 —— 这里按**他自己那条绑定**的每节时长
+       先折成小时，并把折算过程写进预览，别让他对着一个 400 发懵。
+    """
+    hint = None
+    if lessons and X.is_shared(acc):
+        hpl = float(acc.get("hoursPerLesson") or 0)
+        if hpl > 0:
+            hours = round(float(lessons) * hpl, 2)
+            hint = ("🔴 这是一本共享账本（两个孩子同一本），按「节」记账基准不唯一，"
+                    "已按每节 %s 小时折成 %s 小时入账。" % (money(hpl), money(hours)))
+            lessons = None
+    return {"hours": hours, "lessons": lessons, "amount": amount}, hint
+
+
+def _delta_hours(acc, hours, lessons, amount):
+    """三档 → 预计小时变动（🔴 只给预览看，真换算在 BE）。算不出返 None。"""
+    try:
+        if hours:
+            return float(hours)
+        hpl = float(acc.get("hoursPerLesson") or 0)
+        if lessons and hpl > 0:
+            return float(lessons) * hpl
+        pph = float(acc.get("pricePerHour") or 0)
+        if amount and pph > 0:
+            return float(amount) / pph
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+def _after_line(acc, delta_h):
+    """「执行后约：X 小时（≈Y 节）」；算不出就不说（宁可少一行也别报错数）。"""
+    if delta_h is None:
+        return None
+    try:
+        after = float(acc.get("hoursRemain") or 0) + delta_h
+    except (TypeError, ValueError):
+        return None
+    tail = ""
+    hpl = acc.get("hoursPerLesson")
+    if not X.is_shared(acc) and hpl:
+        try:
+            tail = "（≈%s 节）" % money(after / float(hpl))
+        except (TypeError, ZeroDivisionError, ValueError):
+            tail = ""
+    return "执行后约：%s 小时%s" % (money(after), tail)
+
+
+def _price_line(acc):
+    """账户计价口径一行：时薪 + 每节时长（+ 按节报价，方便他对着口头价核）。"""
+    pph = acc.get("pricePerHour")
+    if pph is None:                     # 老镜像兜底：只有元/节时反推
+        return "单价：%s 元/节" % money(acc.get("lessonPrice"))
+    hpl = acc.get("hoursPerLesson")
+    s = "时薪 %s 元/小时" % money(pph)
+    if hpl:
+        s += " · 每节 %s 小时（按节报价 %s 元/节）" % (money(hpl), money(acc.get("lessonPrice")))
+    return s
+
+
 # ───────────────────────────── 六意图 ─────────────────────────────
 
 
@@ -302,24 +374,43 @@ def act_ledger(rep, slots, text, forced_student=None):
         return
     out = ["📊 %s 的账户" % st["name"]]
     for a in accs:
-        out.append("· %s：余 %s 课时 / %s 元（单价 %s 元/节，%s）"
-                   % (a.get("subjectLabel"), money(a.get("hoursRemain")), money(a.get("amountRemain")),
-                      money(a.get("lessonPrice")), "启用" if a.get("status") == "0" else "停用"))
+        out.append("· %s：余 %s ｜ %s ｜ %s%s"
+                   % (a.get("subjectLabel"), X.bal_text(a), _price_line(a),
+                      "启用" if a.get("status") == "0" else "停用",
+                      "（共享账本，两个孩子同一本 → 只报小时）" if X.is_shared(a) else ""))
     main = be().account_of(st, slots.get("subject")) or accs[0]
     lg = be().ledger(main["id"], 8) or {}
     rows = lg.get("rows") or []
     if rows:
         out.append("")
-        out.append("最近 %d 条流水（共 %s 条）：" % (len(rows), lg.get("total")))
+        # 🔴 台账默认落最后一页（最近的行）、页内按业务日期正序（PRD-018 L1/D2）
+        out.append("最近 %d 条流水（共 %s 条，按业务日期正序）：" % (len(rows), lg.get("total")))
         kind = {"1": "充值", "2": "扣课", "3": "冲正", "4": "调整"}
         for r in rows:
-            out.append("  %s %s %s%s 课时 / %s%s 元 ｜ %s"
-                       % (r.get("date"), kind.get(str(r.get("flowType")), "?"),
-                          "+" if (r.get("hoursDelta") or 0) >= 0 else "", money(r.get("hoursDelta")),
-                          "+" if (r.get("amountDelta") or 0) >= 0 else "", money(r.get("amountDelta")),
-                          (r.get("content") or "")[:24]))
+            h = r.get("hoursDelta") or 0
+            amt = r.get("amount") if r.get("amount") is not None else r.get("amountDelta")
+            who = ("[%s] " % r["studentName"]) if r.get("studentName") else ""
+            out.append("  %s %s%s %s%s 小时 / %s%s 元 ｜ 余 %s 小时 ｜ %s"
+                       % (r.get("date"), who, kind.get(str(r.get("flowType")), "?"),
+                          "+" if h >= 0 else "", money(h),
+                          "+" if (amt or 0) >= 0 else "", money(amt),
+                          money(r.get("hoursAfter")), (r.get("content") or "")[:24]))
     out.append("👉 %s" % h5("account"))
     rep.text("\n".join(out))
+
+
+def _planned_hours(row):
+    """一场待结算的**默认实扣小时**。
+
+    🔴 PRD-018 L4：只认 BE 给的 `plannedHours`（= 该绑定的每节时长，与 settleOne 同一个
+       函数算出）。机器人再自己定一个默认值 = 「预览说扣 1 小时、实际扣 1.5 小时」，
+       俊羽一节 1.5 小时，差的就是三分之一的钱。拿不到才退 1.0 占位。
+    """
+    try:
+        v = float(row.get("plannedHours"))
+        return v if v > 0 else 1.0
+    except (TypeError, ValueError):
+        return 1.0
 
 
 def act_settle_pending(rep):
@@ -329,18 +420,26 @@ def act_settle_pending(rep):
         rep.text("✅ 没有待结算的场次，清爽。\n👉 %s" % h5("settle"))
         return
     out = ["📋 待结算 %d 场：" % len(rows)]
-    total = 0.0
+    tot_h, tot_a = 0.0, 0.0
     for r in rows:
-        p = r.get("price")
-        total += float(p or 0)
-        out.append("· %s %s %s %s-%s ｜ %s%s"
+        h = _planned_hours(r)
+        amt = r.get("plannedAmount")
+        tot_h += h
+        tot_a += float(amt or 0)
+        # 🔴 sessionStatus='1' = 已标已上但当时没扣成（D10 拆了收费硬闸，教学事实先落、钱后补）
+        flags = []
+        if str(r.get("sessionStatus")) == "1":
+            flags.append("已上待补扣")
+        if r.get("accountStatus") not in (None, "0"):
+            flags.append("账户停用")
+        out.append("· %s %s %s %s-%s ｜ 预计扣 %s 小时 / %s%s"
                    % (r.get("date"), r.get("targetName"), r.get("subjectLabel"),
-                      r.get("start"), r.get("end"),
-                      ("%s 元/节" % money(p)) if p is not None else "⚠️未开户",
-                      "" if r.get("accountStatus") in (None, "0") else "（账户停用）"))
+                      r.get("start"), r.get("end"), money(h),
+                      ("%s 元" % money(amt)) if amt is not None else "⚠️未开户",
+                      ("（%s）" % "、".join(flags)) if flags else ""))
     out.append("")
-    out.append("按每场 1 课时算，合计约 %s 元。" % money(total))
-    out.append("要结就说「把待办清了」（可加：按 1.5 课时扣 / 只结俊羽的）。")
+    out.append("按各人每节时长算，合计约 %s 小时 / %s 元。" % (money(tot_h), money(tot_a)))
+    out.append("要结就说「把待办清了」（可加：按 1.5 小时扣 / 只结俊羽的）。")
     out.append("👉 %s" % h5("settle"))
     rep.text("\n".join(out))
 
@@ -368,27 +467,34 @@ def act_settle_do(rep, slots, text, forced_student=None):
     if not rows:
         rep.text("按这个条件筛下来没有待结算场次。发「待结算」看看全量。")
         return
-    hours = slots.get("hours") or 1.0
+    # 🔴 老师明说了「按 1.5 小时扣」才覆盖；没说就逐场跟 BE 的 plannedHours（每人每节时长不同）
+    override = slots.get("hours")
     note = slots.get("timeNote")
     items, lines, tot_h, tot_a, warn = [], [], 0.0, 0.0, []
     for r in rows:
+        hours = float(override) if override else _planned_hours(r)
         it = {"sessionId": str(r["sessionId"]), "hours": hours}
         if note:
             it["timeNote"] = note
         items.append(it)
-        p = r.get("price")
-        amt = (float(p) * hours) if p is not None else None
+        pph = r.get("pricePerHour")
+        if not override and r.get("plannedAmount") is not None:
+            amt = float(r["plannedAmount"])
+        else:
+            amt = (float(pph) * hours) if pph is not None else None
         tot_h += hours
         tot_a += amt or 0
-        lines.append("· %s %s %s %s-%s → 扣 %s 课时 / %s"
+        lines.append("· %s %s %s %s-%s → 扣 %s 小时 / %s"
                      % (r.get("date"), r.get("targetName"), r.get("subjectLabel"),
                         r.get("start"), r.get("end"), money(hours),
                         ("%s 元" % money(amt)) if amt is not None else "⚠️未开户，会被跳过"))
-        if p is None:
+        if pph is None and r.get("price") is None:
             warn.append(r.get("targetName"))
     pv = ["【待确认 · 一键结算】共 %d 场" % len(items)] + lines
     pv.append("")
-    pv.append("合计：扣 %s 课时 / %s 元" % (money(tot_h), money(tot_a)))
+    pv.append("合计：扣 %s 小时 / %s 元" % (money(tot_h), money(tot_a)))
+    pv.append("（每场扣多少 = 这个学生每节的时长%s）"
+              % ("；本次按你说的 %s 小时统一覆盖" % money(override) if override else "，系统口径"))
     if note:
         pv.append("实际上课时间备注：%s" % note)
     if warn:
@@ -399,72 +505,107 @@ def act_settle_do(rep, slots, text, forced_student=None):
                                     "expectAmount": tot_a}, "\n".join(pv)))
 
 
+# 老师明说「按小时报价」的说法。没有这些词 = 他报的是**每节**的钱（他一贯的说法）。
+_HOURLY_WORDS = ("时薪", "每小时", "一小时", "每个小时", "元/小时", "元每小时", "/小时", "每时")
+
+
+def _price_per_hour(price, hpl, raw):
+    """老师报的价 → (时薪 元/小时, 他是不是按小时报的)。
+
+    🔴 PRD-018 D1：底账按时薪算，但老师嘴里的价一直是**每节多少钱**（「350 一节」）。
+       时薪 = 每节的钱 ÷ 每节时长。只有他明说「时薪 / 每小时」时才原样收——
+       否则「把时薪改成 260」会被再除一次 1.5 变成 173，一节课差出三分之一的钱。
+    """
+    if price is None:
+        return None, False
+    hourly = any(w in (raw or "") for w in _HOURLY_WORDS)
+    if hourly or not hpl:
+        return round(float(price), 4), hourly
+    return round(float(price) / float(hpl), 4), hourly
+
+
 def act_account(rep, intent, slots, text, forced_student=None):
-    """① 开户 / 充值 / 调整 → 预览（写，需确认）。"""
+    """① 开户 / 充值 / 调整 → 预览（写，需确认）。
+
+    🔴 PRD-018 三档纪律：hours（小时）/ lessons（节）/ amount（元）**老师给哪档传哪档**，
+       换算全在 BE。预览里的换算值一律标「约」，只为让他看懂，不参与落库。
+    """
     st = resolve_student(rep, slots, text, forced_student)
     if not st:
         return
     subject = pick_subject(slots, st)
     acc = be().account_of(st, subject)
-    hours, amount, price = slots.get("hours"), slots.get("amount"), slots.get("price")
+    hours, lessons, amount = slots.get("hours"), slots.get("lessons"), slots.get("amount")
+    raw = slots.get("raw") or text
 
     if intent == I.ACCOUNT_OPEN:
-        if price is None:
-            price = float(acc["lessonPrice"]) if acc and acc.get("lessonPrice") is not None else None
-        if price is None:
-            rep.text("开户要单价。说全一点，比如：给%s开个%s户 350 一节。" % (st["name"], subject))
+        hpl = slots.get("hoursPerLesson") or (acc or {}).get("hoursPerLesson") or 1.0
+        hpl = float(hpl)
+        pph, hourly = _price_per_hour(slots.get("price"), hpl, raw)
+        if pph is None and acc and acc.get("pricePerHour") is not None:
+            pph = float(acc["pricePerHour"])
+        if pph is None:
+            rep.text("开户要报个价。说全一点，比如：给%s开个%s户 350 一节，一节 1.5 小时。"
+                     % (st["name"], subject))
             return
-        if hours and amount is None:
-            amount = hours * price
-        if amount and not hours and price:
-            hours = round(amount / price, 2)
-        pv = ["【待确认 · %s】" % ("改单价" if acc else "开户"),
+        pv = ["【待确认 · %s】" % ("改计价口径" if acc else "开户"),
               "学生：%s" % st["name"], "学科：%s" % subject,
-              "单价：%s 元/节%s" % (money(price),
-                                 ("（原 %s）" % money(acc.get("lessonPrice"))) if acc else "")]
-        if hours or amount:
-            pv.append("顺手充值：+%s 课时 / +%s 元" % (money(hours or 0), money(amount or 0)))
+              "计价：时薪 %s 元/小时 · 每节 %s 小时（按节报价 %s 元/节）"
+              % (money(pph), money(hpl), money(round(pph * hpl, 2)))]
+        if not hourly and slots.get("price"):
+            pv.append("（你说的 %s 是**每节**的钱，除以每节 %s 小时得时薪；"
+                      "要按小时报价就说「时薪 xxx」）" % (money(slots["price"]), money(hpl)))
         if acc:
-            pv.append("当前余额：%s 课时 / %s 元" % (money(acc.get("hoursRemain")), money(acc.get("amountRemain"))))
+            pv.append("原：时薪 %s 元/小时 · 每节 %s 小时"
+                      % (money(acc.get("pricePerHour")), money(acc.get("hoursPerLesson"))))
+        tier, hint = _tier_args(acc or {}, hours, lessons, amount)
+        if any(tier.values()):
+            pv.append("顺手充值：%s" % X.flow_brief(tier))
+            if hint:
+                pv.append(hint)
+        if acc:
+            pv.append("当前余额：%s" % X.bal_text(acc))
         args = {"studentId": st["id"], "studentName": st["name"], "subject": subject,
-                "price": price, "hours": hours, "amount": amount, "note": slots.get("note")}
+                "price": pph, "hoursPerLesson": hpl, "note": slots.get("note"),
+                "occurDate": slots.get("occurDate")}
+        args.update(tier)               # 三档原样透传，BE 管换算
         rep.text(set_pending("account_open", args, "\n".join(pv)))
         return
 
     if not acc:
-        rep.text("%s 还没有 %s 账户，先开户：给%s开个%s户 350 一节。"
+        rep.text("%s 还没有 %s 账户，先开户：给%s开个%s户 350 一节，一节 1.5 小时。"
                  % (st["name"], subject, st["name"], subject))
         return
-    price = float(acc.get("lessonPrice") or 0)
-    if intent == I.ACCOUNT_RECHARGE:
-        if hours is None and amount is None:
-            rep.text("充多少？说个数，比如：%s充 20 节，或 %s充值 7000 元。" % (st["name"], st["name"]))
-            return
-        if hours is not None and amount is None:
-            amount = hours * price
-        if amount is not None and hours is None:
-            hours = round(amount / price, 2) if price else 0
-        flow_type, kind = "1", "充值"
-    else:
-        if hours is None and amount is None:
+    tier, hint = _tier_args(acc, hours, lessons, amount)
+    if not any(tier.values()):
+        if intent == I.ACCOUNT_RECHARGE:
+            rep.text("充多少？三种说法都行：%s充 20 节 / %s充 30 小时 / %s充值 7000 元。"
+                     % (st["name"], st["name"], st["name"]))
+        else:
             rep.text("调整多少？带上正负号，比如：%s调整 -1 节 备注 补扣。" % st["name"])
-            return
-        if hours is not None and amount is None:
-            amount = hours * price
-        if amount is not None and hours is None:
-            hours = 0.0
-        flow_type, kind = "4", "调整"
+        return
+    flow_type, kind = ("1", "充值") if intent == I.ACCOUNT_RECHARGE else ("4", "调整")
+    delta_h = _delta_hours(acc, tier["hours"], tier["lessons"], tier["amount"])
     pv = ["【待确认 · %s】" % kind, "学生：%s ｜ 学科：%s" % (st["name"], subject),
-          "课时：%s%s 节" % ("+" if hours >= 0 else "", money(hours)),
-          "金额：%s%s 元（单价 %s）" % ("+" if amount >= 0 else "", money(amount), money(price)),
-          "当前余额：%s 课时 / %s 元" % (money(acc.get("hoursRemain")), money(acc.get("amountRemain"))),
-          "执行后约：%s 课时 / %s 元" % (money(float(acc.get("hoursRemain") or 0) + hours),
-                                    money(float(acc.get("amountRemain") or 0) + amount))]
+          "本次：%s%s" % (X.flow_brief(tier),
+                        ("（约 %s%s 小时）" % ("+" if delta_h >= 0 else "", money(delta_h)))
+                        if delta_h is not None and not tier["hours"] else "")]
+    if hint:
+        pv.append(hint)
+    # 🔴 PRD-018 D9：补录历史充值可回填真实业务日期（台账按它排序，不再是「记成今天」）
+    if slots.get("occurDate"):
+        pv.append("记账日期：%s（按你说的业务日期入台账，不是今天）" % slots["occurDate"])
+    pv.append("计价：%s" % _price_line(acc))
+    pv.append("当前余额：%s" % X.bal_text(acc))
+    after = _after_line(acc, delta_h)
+    if after:
+        pv.append(after)
     if slots.get("note"):
         pv.append("备注：%s" % slots["note"])
     args = {"accountId": acc["id"], "studentId": st["id"], "studentName": st["name"],
-            "subject": subject, "flowType": flow_type, "hours": hours, "amount": amount,
-            "note": slots.get("note")}
+            "subject": subject, "flowType": flow_type, "note": slots.get("note"),
+            "occurDate": slots.get("occurDate")}
+    args.update(tier)
     rep.text(set_pending("account_flow", args, "\n".join(pv)))
 
 
@@ -510,11 +651,14 @@ def act_leave(rep, slots, text, forced_student=None, forced_session=None):
 
 # ───────────────────────── ⑦ 家庭钱包（好好 + 俊羽） ─────────────────────────
 #
-# 🔴 零 BE 改动的「家庭钱包」玩法（2026-07-31 用户拍板，写死这一家不做通用配置）：
-#   钱包户 = 俊羽户，家里的钱全额充这里；好好户不充值，一路走负数（系统允许欠费）；
-#   家庭真实余额 = 两户 amountRemain 相加。机器人把这套体验包掉。
-#   两人单价/时长不同（俊羽 1.5h、好好 1h），所以**共享的是钱不是节**：
-#   合并只加金额、归账只倒金额，课时列永远各归各户。
+# 🔴 2026-07-31 的「家庭钱包」玩法（钱全充俊羽户、好好户走负数、合计=两户金额相加）
+#    在 PRD-018 v3 之后**基本失效**：账本变成独立实体、学生 n:1 绑账本，
+#    两个孩子已经并成**同一本共享账**，账上天然就是一家的钱，不需要机器人去合。
+#    保留这三个入口只为收住老师的老话术：
+#      · family_ledger  → 还是报「这一家还剩多少」，但按**账本**去重后相加（同一本只算一次）
+#      · family_recharge→ 充进钱包户所在的那本账（并本后就是那本共享账）
+#      · family_rebalance→ 退役，回一句「已经是一本账了」（见 executor._op_family_rebalance）
+#    🔴 合计口径也从「金额相加」改成「小时相加」——金额列已是派生展示值（D1/减法清单）。
 
 FAMILY = {
     "label": "好好 + 俊羽（一家）",
@@ -535,8 +679,32 @@ def _family_members():
     return out
 
 
-def _family_total(members):
-    return sum(float((acc or {}).get("amountRemain") or 0) for _, acc in members)
+def _family_books(members):
+    """→ [(账本, [绑在这本上的学生名])]，**按账本 id 去重**。
+
+    🔴 PRD-018 v3 之后两个孩子很可能绑的是同一本账（共享）。按学生逐个相加，
+       一本账会被数两遍，家里的余额凭空翻倍——这是并本之后最容易出的错。
+    """
+    index, out = {}, []
+    for st, acc in members:
+        if not acc:
+            continue
+        key = str(acc.get("id"))
+        if key in index:
+            index[key][1].append(st.get("name"))
+            continue
+        entry = (acc, [st.get("name")])
+        index[key] = entry
+        out.append(entry)
+    return out
+
+
+def _family_hours(members):
+    return sum(float(acc.get("hoursRemain") or 0) for acc, _ in _family_books(members))
+
+
+def _family_amount(members):
+    return sum(float(acc.get("amountRemain") or 0) for acc, _ in _family_books(members))
 
 
 def act_family_ledger(rep):
@@ -545,26 +713,25 @@ def act_family_ledger(rep):
     if not members:
         rep.text("花名册里没找到这一家的学生，先确认档案还在。")
         return
-    total = _family_total(members)
-    out = ["👪 %s · 家庭钱包" % FAMILY["label"],
-           "💰 合计余额：%s 元" % money(total), "", "各户明细："]
+    books = _family_books(members)
+    hrs, amt = _family_hours(members), _family_amount(members)
+    out = ["👪 %s" % FAMILY["label"],
+           "⏱ 合计余额：%s 小时（金额约 %s 元）" % (money(hrs), money(amt)),
+           "", "账本明细："]
+    for acc, names in books:
+        out.append("· %s：%s ｜ %s%s"
+                   % ("+".join(n for n in names if n) or "未命名",
+                      X.bal_text(acc), _price_line(acc),
+                      "  ⚠️欠费" if float(acc.get("hoursRemain") or 0) < 0 else ""))
     for st, acc in members:
-        tag = "（家庭钱包户）" if str(st.get("id")) == FAMILY["wallet_id"] else ""
         if not acc:
-            out.append("· %s%s：未开户（按 0 计）" % (st.get("name"), tag))
-            continue
-        amt = float(acc.get("amountRemain") or 0)
-        out.append("· %s%s：%s 元 ｜ %s 课时 ｜ 单价 %s 元/节%s"
-                   % (st.get("name"), tag, money(amt), money(acc.get("hoursRemain")),
-                      money(acc.get("lessonPrice")), "  ⚠️欠费" if amt < 0 else ""))
+            out.append("· %s：未开户（按 0 计）" % st.get("name"))
     out.append("")
-    out.append("（钱全额充在%s户，%s户不充、一路走负数；合计=两户相加才是家里的真实余额）"
-               % (FAMILY["wallet_name"],
-                  "、".join(s.get("name") for s, _ in members
-                            if str(s.get("id")) != FAMILY["wallet_id"])))
-    debt = [s.get("name") for s, a in members if float((a or {}).get("amountRemain") or 0) < 0]
-    if debt:
-        out.append("要把 %s 户的负数抹平就说一句「归账」。" % "、".join(debt))
+    if len(books) == 1 and len([1 for _, a in members if a]) > 1:
+        out.append("（两个孩子已经并成**同一本共享账**：上面这一本就是家里的全部课时，"
+                   "谁上课都从这一本扣，不用再合、也没有「归账」这回事。）")
+    else:
+        out.append("（钱全额充在%s户；合计 = 各本相加才是家里的真实余额）" % FAMILY["wallet_name"])
     out.append("👉 %s" % h5("account"))
     rep.text("\n".join(out))
 
@@ -578,79 +745,55 @@ def act_family_recharge(rep, slots):
         return
     st, acc = wallet
     if not acc:
-        rep.text("家庭钱包户（%s）还没开户，先说：给%s开个数学户 350 一节。"
+        rep.text("家庭钱包户（%s）还没开户，先说：给%s开个数学户 350 一节，一节 1.5 小时。"
                  % (st["name"], st["name"]))
         return
-    price = float(acc.get("lessonPrice") or 0)
-    hours, amount = slots.get("hours"), slots.get("amount")
-    if hours is None and amount is None:
-        rep.text("家里充多少？说个数，比如：他们家充 7000。")
+    tier, hint = _tier_args(acc, slots.get("hours"), slots.get("lessons"), slots.get("amount"))
+    if not any(tier.values()):
+        rep.text("家里充多少？说个数，比如：他们家充 7000（也可以说充 20 节 / 充 30 小时）。")
         return
-    if hours is not None and amount is None:
-        amount = hours * price
-    if amount is not None and hours is None:
-        hours = round(amount / price, 2) if price else 0
-    total = _family_total(members)
+    delta_h = _delta_hours(acc, tier["hours"], tier["lessons"], tier["amount"])
+    hrs = _family_hours(members)
     pv = ["【待确认 · 家庭充值】",
-          "🔴 家庭钱包 = %s户，这笔钱全额充进%s户（另一个孩子的户不充、照常走负数）"
-          % (st["name"], st["name"]),
-          "学科：%s ｜ 单价：%s 元/节" % (acc.get("subjectLabel") or "数学", money(price)),
-          "金额：+%s 元" % money(amount),
-          "课时：+%s 节（按%s单价折算，记在%s户）" % (money(hours), st["name"], st["name"]),
-          "",
-          "%s户：%s 课时 / %s 元 → 约 %s 课时 / %s 元"
-          % (st["name"], money(acc.get("hoursRemain")), money(acc.get("amountRemain")),
-             money(float(acc.get("hoursRemain") or 0) + hours),
-             money(float(acc.get("amountRemain") or 0) + amount)),
-          "家庭合计：%s 元 → %s 元" % (money(total), money(total + amount))]
+          ("🔴 两个孩子已并成同一本共享账，这笔钱充进这一本，谁上课都从这里扣。"
+           if X.is_shared(acc) else
+           "🔴 家庭钱包 = %s户，这笔钱全额充进%s户（另一个孩子的户不充、照常走负数）"
+           % (st["name"], st["name"])),
+          "学科：%s ｜ 计价：%s" % (acc.get("subjectLabel") or "数学", _price_line(acc)),
+          "本次：%s%s" % (X.flow_brief(tier),
+                        ("（约 %s 小时）" % money(delta_h))
+                        if delta_h is not None and not tier["hours"] else "")]
+    if hint:
+        pv.append(hint)
+    if slots.get("occurDate"):
+        pv.append("记账日期：%s" % slots["occurDate"])
+    pv.append("")
+    pv.append("这本账：%s" % X.bal_text(acc))
+    after = _after_line(acc, delta_h)
+    if after:
+        pv.append(after)
+    if delta_h is not None:
+        pv.append("家里合计：%s 小时 → 约 %s 小时" % (money(hrs), money(hrs + delta_h)))
     if slots.get("note"):
         pv.append("备注：%s" % slots["note"])
     args = {"accountId": acc["id"], "studentId": st["id"], "studentName": st["name"],
-            "subject": acc.get("subjectLabel"), "flowType": "1", "hours": hours,
-            "amount": amount, "note": slots.get("note") or "家庭充值"}
+            "subject": acc.get("subjectLabel"), "flowType": "1",
+            "occurDate": slots.get("occurDate"), "note": slots.get("note") or "家庭充值"}
+    args.update(tier)
     rep.text(set_pending("account_flow", args, "\n".join(pv)))
 
 
 def act_family_rebalance(rep):
-    """⑦-3 归账对倒：欠费户补齐、钱包户等额扣，一次确认打包两条调整。"""
-    members = _family_members()
-    wallet = next(((s, a) for s, a in members if str(s.get("id")) == FAMILY["wallet_id"]), None)
-    debts = [(s, a) for s, a in members
-             if str(s.get("id")) != FAMILY["wallet_id"] and a
-             and float(a.get("amountRemain") or 0) < 0]
-    if not wallet or not wallet[1]:
-        rep.text("家庭钱包户（%s）还没开户，没法归账。" % FAMILY["wallet_name"])
-        return
-    if not debts:
-        others = [s.get("name") for s, a in members if str(s.get("id")) != FAMILY["wallet_id"]]
-        rep.text("✅ 无需归账：%s 户余额没有负数（未开户或已 ≥ 0）。\n👉 %s"
-                 % ("、".join(others) or "另一个", h5("account")))
-        return
-    if len(debts) > 1:                   # 本家只有两口，留个防呆
-        rep.text("这一家有多个欠费户，机器人只处理单个，请上 H5 手工归账：%s" % h5("account"))
-        return
-    dst, dacc = debts[0]
-    wst, wacc = wallet
-    deficit = -float(dacc.get("amountRemain") or 0)
-    total = _family_total(members)
-    pv = ["【待确认 · 家庭归账（两条调整打包）】",
-          "%s户欠 %s 元 → 从「%s户（家庭钱包）」等额对倒平掉。" % (dst["name"], money(deficit), wst["name"]),
-          "",
-          "① %s户：金额 +%s 元 → %s 元（归零）" % (dst["name"], money(deficit),
-                                            money(float(dacc.get("amountRemain") or 0) + deficit)),
-          "② %s户：金额 -%s 元 → %s 元" % (wst["name"], money(deficit),
-                                       money(float(wacc.get("amountRemain") or 0) - deficit)),
-          "备注都记「家庭归账」。",
-          "",
-          "🔴 只倒金额列，两边课时列都不动——两人单价时长不同，课时跨户搬就失真了；",
-          "   家里共享的是钱不是节。%s户课时仍是 %s（她自己那本账照旧）。"
-          % (dst["name"], money(dacc.get("hoursRemain"))),
-          "家庭合计余额：%s 元 → %s 元（对倒不改变合计，只是换个口袋）"
-          % (money(total), money(total))]
-    args = {"debtAccountId": dacc["id"], "debtName": dst["name"],
-            "walletAccountId": wacc["id"], "walletName": wst["name"],
-            "amount": deficit, "memberIds": FAMILY["member_ids"], "note": "家庭归账"}
-    rep.text(set_pending("family_rebalance", args, "\n".join(pv)))
+    """⑦-3 归账对倒 —— 🔴 PRD-018 退役。
+
+    金额列已删（余额 = 小时 × 时薪，全程派生），两个孩子又并成了同一本共享账：
+    「把好好户的负数从俊羽户对倒平掉」这件事在新模型里**没有对应物**了。
+
+    这里直接回一句解释，**不再挂确认闸**——挂闸的意思是「等你点头我去写库」，
+    而这个 op 已经一个字都不写（executor._op_family_rebalance 只回文案），
+    让老师为一个空动作按一次「确认」是骗他。
+    """
+    rep.text(X.run_op(None, "family_rebalance", {})["text"])
 
 
 def _find_sheet(be_, target_id, lesson_date, session_id=None):
@@ -726,10 +869,13 @@ def act_ingest_lesson_log(rep, slots, text, forced_student=None):
     subject = pick_subject(slots, st)
     acc = be().account_of(st, subject)
     if not acc:
-        rep.text("%s 还没有 %s 账户，补录进去也没地方扣课时。先开户：给%s开个%s户 350 一节。"
+        rep.text("%s 还没有 %s 账户，补录进去也没地方扣课时。先开户：给%s开个%s户 350 一节，一节 1.5 小时。"
                  % (st["name"], subject, st["name"], subject))
         return
-    price = float(acc.get("lessonPrice") or 0)
+    # 🔴 PRD-018：课时本上写的是「节」，系统底账是「小时」，换算基准 = 这个学生的每节时长。
+    #    price_per_hour 用来估这批课值多少钱（只进预览，不进落库）。
+    hpl = float(acc.get("hoursPerLesson") or 1.0) or 1.0
+    price_h = float(acc.get("pricePerHour") or 0)
 
     # 🔴 这句必须在读图 pass **开始之前**发：读图动辄 1~3 分钟，中间一个字都没有，
     #    老师会以为又挂了（然后重发一条 = 又一趟钱）。把耗时说死，他才肯等。
@@ -797,12 +943,18 @@ def act_ingest_lesson_log(rep, slots, text, forced_student=None):
         return
 
     # ── ② 组装 items / 结算量 / 充值笔 ──
-    items, hours_by_key, tot_h, guessed = [], {}, 0.0, []
+    # 🔴 单位换轨（PRD-018）：本子上的「1 节」→ 落库要的是**小时** = 节 × 该学生每节时长。
+    #    俊羽一节 1.5 小时，照着本子填 1 就是每节少扣三分之一，20 节下来差一大截。
+    items, hours_by_key, lessons_by_key, content_by_key, tot_h, guessed = [], {}, {}, {}, 0.0, []
     for rc in todo:
-        hrs = rc.get("hours")
-        if hrs is None or hrs <= 0:
-            hrs = 1.0
-            guessed.append(rc["date"])
+        lessons = rc.get("lessons")
+        if rc.get("hours"):                       # 本子上直接写小时的罕见情况，原样用
+            hrs, lessons = float(rc["hours"]), None
+        else:
+            if lessons is None or lessons <= 0:
+                lessons = 1.0
+                guessed.append(rc["date"])
+            hrs = round(float(lessons) * hpl, 2)
         title = rc.get("title") or ""
         items.append({"date": rc["date"], "start": rc["start"], "end": rc["end"],
                       "sessionType": "1", "subject": subject,
@@ -811,40 +963,47 @@ def act_ingest_lesson_log(rep, slots, text, forced_student=None):
                       #    note 是 H5 排课页能看到的那一栏，externalTitle 留作原文存档。
                       "externalTitle": title or None,
                       "note": ("课时本补录：%s" % title) if title else "课时本补录"})
-        hours_by_key[_sess_key(rc["date"], rc["start"])] = hrs
+        key = _sess_key(rc["date"], rc["start"])
+        hours_by_key[key] = hrs
+        lessons_by_key[key] = lessons
+        # 🔴 PRD-018 D5/G7：结算时把「这节实际讲了什么」写进 session.content，
+        #    台账与流水单的「内容」列优先取它 —— 不再是永远一个「正课」。
+        if title:
+            content_by_key[key] = title
         tot_h += hrs
-    tot_a = tot_h * price
+    tot_a = tot_h * price_h
 
     # 他明说「只补上课记录、充值我自己充过了」→ 充值笔整块不做（查不了重，只能听他的）
+    # 🔴 三档原样透传（D9）：本子写「+10 节」就传 lessons=10，写金额就传 amount，
+    #    换算交 BE；occurDate 回填**本子上那天**（占位列已就位，不再只能塞进备注）。
     recharges = []
     for rc in ([] if slots.get("noRecharge") else (r.get("recharges") or [])):
-        h, a = rc.get("hours"), rc.get("amount")
-        if h is not None and a is None:
-            a = h * price
-        if a is not None and h is None:
-            h = round(a / price, 2) if price else 0
         d = rc.get("date")
-        recharges.append({"hours": h, "amount": a,
-                          "note": "%s 充值 %s 节（课时本补录）"
-                                  % (d or "（日期未读出）", money(h))})
+        tier = {"hours": rc.get("hours"), "lessons": rc.get("lessons"), "amount": rc.get("amount")}
+        recharges.append(dict(tier, occurDate=d,
+                              note="%s 充值 %s（课时本补录）"
+                                   % (d or "（日期未读出）", X.flow_brief(tier))))
 
     # ── ③ 预览：逐条摊开让他核 ──
-    pv = ["【待确认 · 看课时本补录】学生：%s ｜ 学科：%s ｜ 单价 %s 元/节"
-          % (st["name"], subject, money(price)),
+    pv = ["【待确认 · 看课时本补录】学生：%s ｜ 学科：%s ｜ %s"
+          % (st["name"], subject, _price_line(acc)),
           "",
           "要补录这 %d 节课（建场次 + 当场扣课时）：" % len(items)]
     for rc in todo:
-        hrs = hours_by_key[_sess_key(rc["date"], rc["start"])]
+        key = _sess_key(rc["date"], rc["start"])
+        hrs, lessons = hours_by_key[key], lessons_by_key[key]
         flags = []
         if rc.get("_timeGuessed"):
             flags.append("时间没读清，按本子上其它行的 %s-%s 计" % (m_start, m_end))
         if rc["date"] in guessed:
-            flags.append("课时数没读出，按 1 节算")
-        pv.append("  · %s %s-%s ｜ %s ｜ 扣 %s 节%s"
+            flags.append("节数没读出，按 1 节算")
+        deduct = ("%s 节 = %s 小时" % (money(lessons), money(hrs))) if lessons else ("%s 小时" % money(hrs))
+        pv.append("  · %s %s-%s ｜ %s ｜ 扣 %s%s"
                   % (rc["date"], rc["start"], rc["end"], rc.get("title") or "（内容没读出）",
-                     money(hrs), ("（%s）" % "；".join(flags)) if flags else ""))
+                     deduct, ("（%s）" % "；".join(flags)) if flags else ""))
     pv.append("")
-    pv.append("合计扣：%s 课时 / %s 元" % (money(tot_h), money(tot_a)))
+    pv.append("合计扣：%s 小时 / %s 元（一节按 %s 小时算）"
+              % (money(tot_h), money(tot_a), money(hpl)))
     # 上课内容整列没读出来（手写连笔+照片横放时常见）：账目照样是准的，但内容栏会是空的，
     # 先把「值不值得重拍」这个选择摆给他，别让他确认完才发现内容全空。
     n_blank = sum(1 for rc in todo if not rc.get("title"))
@@ -870,14 +1029,16 @@ def act_ingest_lesson_log(rep, slots, text, forced_student=None):
         pv.append("")
         pv.append("还要补 %d 笔充值：" % len(recharges))
         for rc in recharges:
-            pv.append("  · +%s 课时 / +%s 元 ｜ 备注「%s」"
-                      % (money(rc["hours"]), money(rc["amount"]), rc["note"]))
-        pv.append("🔴 充值这几行在台账上的**日期会记成今天**——系统的充值流水没有业务日期列，"
-                  "真实日期只能写在备注里。上课扣课时那些行不受影响，走的是场次日期，是对的。")
-        # 🔴 上课记录能按「同日同时段」查重，充值笔查不了（流水表没有业务日期列，
-        #    对不上"这笔是不是就是那笔"）。宁可把这个洞明说给他，也不要闷头充重。
-        pv.append("🔴 充值笔我**没法查重**（原因同上：流水表没有业务日期）。"
-                  "这几笔里只要有一笔你以前已经充过，就会重复充。已经充过的话回「取消」，"
+            pv.append("  · %s ｜ 记账日期 %s ｜ 备注「%s」"
+                      % (X.flow_brief(rc), rc.get("occurDate") or "（没读出，记今天）", rc["note"]))
+        # 🔴 PRD-018 D9：流水有 occur_date 业务日期列了，补录充值直接回填本子上那天，
+        #    台账按业务日期正序排 —— 「日期只能写在备注里」那套说辞已作废。
+        pv.append("✅ 这几笔的**台账日期 = 本子上那天的真实业务日期**（不是今天），"
+                  "台账按业务日期正序排，补录进去也不会插错位置。")
+        # 上课记录能按「同日同时段」查重，充值笔仍然查不了：系统不会拦重复充值，
+        # 而"这笔是不是就是那笔"机器判不了。宁可把这个洞明说给他，也不要闷头充重。
+        pv.append("🔴 但充值笔我**没法查重**——系统不拦重复充值，我也认不出这笔是不是你以前充过的那笔。"
+                  "只要有一笔你已经充过，就会重复充。拿不准就回「取消」，"
                   "改说一句「只补上课记录，不补充值」。")
     elif slots.get("noRecharge") and (r.get("recharges") or []):
         pv.append("")
@@ -885,8 +1046,7 @@ def act_ingest_lesson_log(rep, slots, text, forced_student=None):
                   % len(r.get("recharges") or []))
     pv.append("")
     pv.append("🔴 上面是**机器读手写体**的结果，请逐条对着本子核一遍再确认。")
-    pv.append("🔴 上课内容会记进场次备注（H5 排课页能看到）；课时流水单的「内容」列"
-              "系统固定显示「正课」，那是后端口径，不是没录进去。")
+    pv.append("🔴 上课内容会记进场次（H5 排课页能看到），课时流水单的「内容」列也直接显示它。")
     pv.append("确认后我会：建场次 → 立刻逐场结算 → 补充值笔 → 出一张课时流水单发你核对。"
               "（补录的历史场次会瞬间进「待结算」，所以这三步我不停顿、一口气做完。）")
     if notes:
@@ -894,6 +1054,7 @@ def act_ingest_lesson_log(rep, slots, text, forced_student=None):
 
     args = {"studentId": st["id"], "studentName": st["name"], "subject": subject,
             "accountId": acc["id"], "items": items, "hoursByKey": hours_by_key,
+            "contentByKey": content_by_key,
             "expectAmount": tot_a, "recharges": recharges, "usedImages": True}
     rep.text(set_pending("ingest_lesson_log", args, "\n".join(pv)))
 

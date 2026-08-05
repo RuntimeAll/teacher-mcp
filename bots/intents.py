@@ -35,7 +35,7 @@ FEEDBACK_IMAGE = "feedback_image"   # ⑥ 作业图 → 多模态建反馈单（
 LEDGER = "ledger"                   # ⑤ 查台账 / 流水 / 余额（只读）
 FAMILY_LEDGER = "family_ledger"     # ⑦ 家庭合并余额（只读）
 FAMILY_RECHARGE = "family_recharge"  # ⑦ 家庭充值 → 全额进钱包户（写）
-FAMILY_REBALANCE = "family_rebalance"  # ⑦ 归账对倒（写）
+FAMILY_REBALANCE = "family_rebalance"  # ⑦ 归账对倒（🔴 PRD-018 退役，executor 回提示语；常量保留只为收住老话术）
 INGEST_LESSON_LOG = "ingest_lesson_log"  # ⑧ 看手写课时本照片 → 补录历史场次 + 结算 + 充值（写）
 CONFIRM = "confirm"                 # 确认闸
 CANCEL = "cancel"                   # 取消
@@ -50,8 +50,8 @@ WRITE_INTENTS = {
 CAPABILITY_LIST = """我做教务速办这几件事（说人话就行，不用背指令）：
 
 ① 账户｜开户 / 充值 / 调整
-   · 给俊羽开个数学户 350 一节
-   · 俊羽充 20 节
+   · 给俊羽开个数学户 350 一节，一节 1.5 小时
+   · 俊羽充 20 节   · 俊羽充 30 小时   · 俊羽交了 7000
    · 俊羽调整 -1 节 备注 补扣
 ② 结算｜查待办 / 一键结算
    · 有几场待结算
@@ -61,13 +61,13 @@ CAPABILITY_LIST = """我做教务速办这几件事（说人话就行，不用�
 ④ 写反馈（口述要点）
    · 帮我写今天俊羽的反馈：讲了周期问题，掌握不错；三位数乘两位数还要巩固
 ⑤ 查台账 / 流水 / 余额
-   · 俊羽台账      · 俊羽还剩多少课时
+   · 俊羽台账      · 俊羽还剩多少（报小时，顺带折成几节）
 ⑥ 发作业图 → 自动整理反馈单
    · 发学生做的题/板书照片（可多张），再说一句「看图写反馈」
 ⑦ 家庭钱包（好好 + 俊羽一家）
-   · 他们家还剩多少     —— 两户金额相加的合计
+   · 他们家还剩多少     —— 合计小时（同一本共享账只报一次）
    · 他们家充 7000      —— 全额充进家庭钱包户（俊羽户）
-   · 归账              —— 好好户欠的钱从俊羽户对倒平掉
+   · 归账              —— 已退役：两个孩子的课时已并成一本共享账，没有对倒这回事
 ⑧ 看手写课时本 → 补录历史记录
    · 拍纸质课时本发我，再说「这是俊羽的课时记录，帮我补录进系统」
    · 我逐行读给你看 → 你核对 → 确认后建场次 + 扣课时 + 补充值笔
@@ -124,14 +124,52 @@ def _to_num(s):
 
 _PRICE_EXPR = re.compile(r"\d+(?:\.\d+)?\s*元?\s*(?:一节|每节|／节|/节|一课时|每课时)")
 
+# 🔴 PRD-018：小时 / 节是**两个单位**，解析件必须分开（见 parse_hours / parse_lessons）。
+_HOUR_UNIT = r"\s*(?:个)?\s*(?:小时|钟头|h|H|hr|hrs)"
+# 「每节时长」表达式（两种语序）：「一节 1.5 小时」「1.5 小时算一节」。
+# 它里面既有「节」又有「小时」，不先剥掉会同时污染 parse_lessons（读出 1 节）
+# 和 parse_hours（读出 1.5 小时）——「开个户 350 一节（1.5 小时）」会凭空多出一笔充值。
+_HPL_EXPR = re.compile(
+    r"(?:一节课?|每节课?|一课时|每课时)\s*(?:是|=|＝|按|为|大约|约)?\s*(?:一个半|" + _NUM + r")" + _HOUR_UNIT
+    + r"|(?:一个半|" + _NUM + r")" + _HOUR_UNIT + r"\s*(?:算|当|为|是)?\s*(?:一节课?|每节课?|／节|/节|一课时)")
+
+
+def _to_hour_num(s):
+    """时长专用数字：额外认「一个半」= 1.5（中文数字只补这一个最常说的）。"""
+    if s is None:
+        return None
+    s = s.strip()
+    if s in ("一个半", "1个半"):
+        return 1.5
+    return _to_num(s)
+
 
 def parse_hours(text):
-    """「20 节」「1.5 课时」「两次」→ float。带正负号则保留符号（调整场景）。
+    """🔴 只认**小时**：「3 小时」「1.5个小时」「2h」「半小时」→ float。带正负号保留符号。
 
-    🔴 先剥掉单价表达式——「350 一节充 20 节」里的「一节」是单价的量词不是课时数，
+    PRD-018 之前它连「节/课时/次」一起吃（那时账本是节本位）；现在底账是小时本位、
+    「节」另有 parse_lessons 走 lessons 档交 BE 换算，两者绝不能再混。
+    """
+    text = _HPL_EXPR.sub(" ", text or "")
+    m = re.search(r"([+\-＋－]?)\s*(一个半|" + _NUM + r")" + _HOUR_UNIT, text)
+    if not m:
+        return None
+    v = _to_hour_num(m.group(2))
+    if v is None:
+        return None
+    return -v if m.group(1) in ("-", "－") else v
+
+
+def parse_lessons(text):
+    """🔴 只认**节**：「20 节」「1.5 课时」「两次」→ float。带正负号保留符号（调整场景）。
+
+    老师嘴里的「节 / 节课 / 次 / 课时」历史上一律是「节」，原样进 lessons 档，
+    折成多少小时由 BE 按每节时长算（PRD-018 D9），机器人不替它换算。
+
+    🔴 先剥单价与每节时长表达式——「350 一节充 20 节」里的「一节」是单价的量词，
     不剥会把 20 节读成 1 节（自测抓到的真 bug）。
     """
-    text = _PRICE_EXPR.sub(" ", text)
+    text = _PRICE_EXPR.sub(" ", _HPL_EXPR.sub(" ", text or ""))
     m = re.search(r"([+\-＋－]?)\s*(" + _NUM + r")\s*(?:节课|节|课时|次)", text)
     if not m:
         return None
@@ -139,6 +177,20 @@ def parse_hours(text):
     if v is None:
         return None
     return -v if m.group(1) in ("-", "－") else v
+
+
+def parse_hours_per_lesson(text):
+    """「一节 1.5 小时」「每节1.5小时」「一节课一个半小时」「1.5 小时算一节」→ 1.5。
+
+    = 账本绑定层的 hours_per_lesson（PRD-018 D1 v2.1）。读不出返 None（调用方退默认 1.0
+    或沿用账户现值）。中文数字只认「一个半」，其余按数字型识别。
+    """
+    m = _HPL_EXPR.search(text or "")
+    if not m:
+        return None
+    n = re.search(r"(一个半|" + _NUM + r")" + _HOUR_UNIT, m.group(0))
+    v = _to_hour_num(n.group(1)) if n else None
+    return v if v and v > 0 else None
 
 
 def parse_amount(text):
@@ -152,9 +204,16 @@ def parse_amount(text):
 
 
 def parse_price(text):
-    """「350 一节」「每节 350」「单价 350」→ float。"""
+    """「350 一节」「每节 350」「单价 350」「时薪 260」→ float（老师报的那个数，单位看说法）。
+
+    🔴 单位不在这里判：是「每节的钱」还是「时薪」由调用方看措辞定
+    （jiaowu_bot._price_per_hour）。这里只负责把数字捞出来。
+    🔴 「按 N」后面跟着 节/课时/次/小时 的一律不算价（「按 1.5 课时扣」是结算量，
+       被读成单价 1.5 元会让开户预览出现一个荒唐的价）。
+    """
     for pat in (r"(\d+(?:\.\d+)?)\s*(?:元)?\s*(?:一节|每节|／节|/节|一课时|每课时)",
-                r"(?:单价|价格|按)\s*(\d+(?:\.\d+)?)\s*(?:元)?"):
+                r"(?:单价|价格|时薪|按)\s*(?:改成|调成|改为|变成|设为|是|=|＝)?\s*"
+                r"(\d+(?:\.\d+)?)(?![\d.])\s*(?:元)?(?!\s*(?:节|课时|次|小时))"):
         m = re.search(pat, text)
         if m:
             return float(m.group(1))
@@ -162,7 +221,11 @@ def parse_price(text):
 
 
 def parse_settle_hours(text):
-    """②「按 1.5 课时扣」「每场扣 2 节」→ 本次结算实扣课时。"""
+    """②「按 1.5 课时扣」「每场扣 2 节」→ 本次结算实扣量。
+
+    🔴 语义不动（PRD-018）：结算入参 `items[].hours` 本来就是**小时**，老师这句话说的
+    「1.5 课时」在结算语境里就是 1.5 小时；不给就走 BE 的 plannedHours（=每节时长）。
+    """
     m = re.search(r"(?:按|每场|一场|各)\s*(" + _NUM + r")\s*(?:节|课时)", text)
     if m:
         return _to_num(m.group(1))
@@ -281,14 +344,21 @@ def extract(text, roster, today):
     多解析出来的槽位没人用也无害，漏解析才要命。
     """
     t = text or ""
+    settle_h = parse_settle_hours(t)
+    hours, lessons = parse_hours(t), parse_lessons(t)
+    if settle_h is not None:
+        # 「按 1.5 课时扣」= 本次结算实扣量（入参口径 = 小时），它不是一笔充值的节数，
+        # 认它就不要再往 lessons 里塞一份，免得同一句话被两个档同时读走。
+        hours, lessons = settle_h, None
     return {
         "students": match_students(t, roster),
         "subject": parse_subject(t),
         "date": parse_date(t, today),
         "note": parse_note(t),
         "price": parse_price(t),
-        # 「按 1.5 课时扣」这种结算量优先，其次才是通用的「20 节」
-        "hours": parse_settle_hours(t) if parse_settle_hours(t) is not None else parse_hours(t),
+        "hours": hours,               # 🔴 小时（PRD-018 底账单位）
+        "lessons": lessons,           # 🔴 节（交 BE 按每节时长换算）
+        "hoursPerLesson": parse_hours_per_lesson(t),
         "amount": parse_amount(t),
         "timeNote": parse_time_note(t),
         "sessionId": parse_session_id(t),
